@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaOS — Media Department Platform</title>
+
+  <!-- CSS: variables first, then base, then layout + components, then modules -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/modules/viral-research.css">
+</head>
+<body>
+
+  <div class="app" id="app">
+
+    <!-- ========== Sidebar ========== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">🎬</span>
+          <div class="logo-text">
+            <div class="logo-title">MediaOS</div>
+            <div class="logo-sub">Media Department</div>
+          </div>
+        </div>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebarNav">
+        <div class="nav-section">
+          <div class="nav-section-label">NGHIÊN CỨU</div>
+          <a class="nav-item" data-page="research" href="#research">
+            <span class="nav-icon">🔍</span>
+            <span class="nav-label">Viral Research</span>
+          </a>
+          <a class="nav-item" data-page="trends" href="#trends">
+            <span class="nav-icon">📈</span>
+            <span class="nav-label">Trend Analysis</span>
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-label">NỘI DUNG</div>
+          <a class="nav-item" data-page="knowledge" href="#knowledge">
+            <span class="nav-icon">📚</span>
+            <span class="nav-label">Knowledge Base</span>
+          </a>
+          <a class="nav-item" data-page="campaigns" href="#campaigns">
+            <span class="nav-icon">🗓️</span>
+            <span class="nav-label">Campaigns</span>
+          </a>
+          <a class="nav-item" data-page="ideas" href="#ideas">
+            <span class="nav-icon">💡</span>
+            <span class="nav-label">Ideas Board</span>
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-label">QUẢN LÝ</div>
+          <a class="nav-item" data-page="team" href="#team">
+            <span class="nav-icon">👥</span>
+            <span class="nav-label">Team</span>
+          </a>
+          <a class="nav-item" data-page="guidelines" href="#guidelines">
+            <span class="nav-icon">📋</span>
+            <span class="nav-label">Guidelines & SOP</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <span class="user-avatar">👤</span>
+          <div>
+            <div class="user-name">Media Team</div>
+            <div class="user-role">MediaOS v2</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ========== Main Content ========== -->
+    <main class="main-content" id="mainContent">
+      <header class="topbar" id="topbar">
+        <button class="topbar-menu" id="topbarMenu" aria-label="Mở menu">☰</button>
+        <div class="topbar-title" id="topbarTitle">Viral Research</div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost btn-sm" id="themeToggle" title="Đổi theme">🌙</button>
+        </div>
+      </header>
+
+      <div class="page-container" id="pageContainer">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tải...</p>
+        </div>
+      </div>
+    </main>
+
+  </div><!-- /.app -->
+
+  <!-- ========== Modal ========== -->
+  <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal" id="modal" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle"></h3>
+        <button class="modal-close" id="modalClose" aria-label="Đóng">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- ========== Toast ========== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ========== Sidebar overlay (mobile) ========== -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ========== Scripts — ordered by dependency ========== -->
+  <!-- Utils (no deps) -->
+  <script src="js/utils/dom.js"></script>
+  <script src="js/utils/format.js"></script>
+  <script src="js/utils/toast.js"></script>
+
+  <!-- Core (depends on utils) -->
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+
+  <!-- Viral Research module (depends on core + utils) -->
+  <script src="modules/viral-research/data.js"></script>
+  <script src="modules/viral-research/viral-score.js"></script>
+  <script src="modules/viral-research/filters.js"></script>
+  <script src="modules/viral-research/cards.js"></script>
+  <script src="modules/viral-research/index.js"></script>
+
+  <!-- Router + App init (must be last) -->
+  <script src="js/router.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

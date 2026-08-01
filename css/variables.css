@@ -1,0 +1,69 @@
+/* ============================================================
+   MediaOS — Design Tokens
+   ============================================================ */
+
+:root {
+  /* Brand */
+  --primary:        #e8315a;
+  --primary-dark:   #c42448;
+  --primary-light:  #ff6b8a;
+  --primary-muted:  rgba(232, 49, 90, 0.12);
+
+  /* Sidebar */
+  --sidebar-w:           240px;
+  --sidebar-bg:          #1a2035;
+  --sidebar-border:      #2a3350;
+  --sidebar-text:        #8896b3;
+  --sidebar-active-bg:   rgba(232, 49, 90, 0.15);
+  --sidebar-active-text: #e8315a;
+  --sidebar-hover-bg:    rgba(255, 255, 255, 0.05);
+
+  /* Layout */
+  --topbar-h: 56px;
+
+  /* Surface */
+  --bg:          #f4f5f7;
+  --surface:     #ffffff;
+  --surface-2:   #f8f9fb;
+  --shadow-sm:   0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+  --shadow-md:   0 4px 16px rgba(0,0,0,0.12);
+
+  /* Text */
+  --text-1:     #1a202c;
+  --text-2:     #718096;
+  --text-3:     #a0aec0;
+
+  /* Border */
+  --border:     #e2e8f0;
+  --border-2:   #cbd5e0;
+
+  /* Status */
+  --success:    #38a169;
+  --warning:    #d69e2e;
+  --error:      #e53e3e;
+  --info:       #3182ce;
+
+  /* Radius */
+  --r-sm:   6px;
+  --r:      10px;
+  --r-lg:   16px;
+  --r-full: 9999px;
+
+  /* Typography */
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* Transition */
+  --t: 0.2s ease;
+}
+
+[data-theme="dark"] {
+  --bg:        #0f1624;
+  --surface:   #1a2332;
+  --surface-2: #1f2d40;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --text-1:    #e0eaf8;
+  --text-2:    #8896b3;
+  --border:    #2a3350;
+  --border-2:  #3a4d70;
+}
