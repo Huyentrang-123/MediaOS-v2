@@ -36,7 +36,7 @@ function buildStatsBar() {
   const total    = VR_DATA.length;
   const tiktok   = VR_DATA.filter(v => v.platform === 'tiktok').length;
   const fb       = VR_DATA.filter(v => v.platform === 'facebook').length;
-  const topScore = Math.max(...VR_DATA.map(v => v.viralScore));
+  const topScore = Math.max(...VR_DATA.map(v => calculateViralScore(v, VR_DATA)));
 
   return `
     <div class="vr-stats-bar">

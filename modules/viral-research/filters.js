@@ -5,7 +5,13 @@
 'use strict';
 
 function applyFilters(videos, filterState) {
-  let result = videos.slice();
+  /* Score each video normalized against the full dataset */
+  const enriched = videos.map(v => ({
+    ...v,
+    viralScore: calculateViralScore(v, videos)
+  }));
+
+  let result = enriched.slice();
 
   if (filterState.platform !== 'all') {
     result = result.filter(v => v.platform === filterState.platform);
@@ -24,7 +30,6 @@ function applyFilters(videos, filterState) {
     );
   }
 
-  /* AI luôn tự xếp theo viral score — không có user sort */
   result.sort((a, b) => b.viralScore - a.viralScore);
   return result;
 }

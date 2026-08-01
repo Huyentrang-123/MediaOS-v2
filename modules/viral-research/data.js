@@ -17,7 +17,6 @@ const VR_DATA = [
     viewsGrowth7d: 340,
     comments: 9200,
     shares: 45000,
-    viralScore: 91,
     tags: ['nightroutine', 'dưỡngda', 'skincare'],
     url: 'https://www.tiktok.com/search?q=routine+d%C6%B0%E1%BB%A1ng+da+ban+%C4%91%C3%AAm'
   },
@@ -33,7 +32,6 @@ const VR_DATA = [
     viewsGrowth7d: 280,
     comments: 7400,
     shares: 32000,
-    viralScore: 88,
     tags: ['vitaminC', 'trịnám', 'beforeafter'],
     url: 'https://www.facebook.com/search/videos/?q=serum+vitamin+c+tri+nam'
   },
@@ -49,7 +47,6 @@ const VR_DATA = [
     viewsGrowth7d: 520,
     comments: 19400,
     shares: 102000,
-    viralScore: 97,
     tags: ['glassskin', '스킨케어', 'kbeauty'],
     url: 'https://www.tiktok.com/search?q=glass+skin+korean+routine'
   },
@@ -65,7 +62,6 @@ const VR_DATA = [
     viewsGrowth7d: 410,
     comments: 23100,
     shares: 120000,
-    viralScore: 96,
     tags: ['美白', '祛斑', '精华'],
     url: 'https://www.tiktok.com/search?q=%E7%BE%8E%E7%99%BD%E7%B2%BE%E5%8D%8E'
   },
@@ -81,7 +77,6 @@ const VR_DATA = [
     viewsGrowth7d: 390,
     comments: 16800,
     shares: 89000,
-    viralScore: 94,
     tags: ['kemnam', 'trịnám', 'dưỡngda'],
     url: 'https://www.facebook.com/search/videos/?q=kem+nam+ban+dem'
   },
@@ -97,7 +92,6 @@ const VR_DATA = [
     viewsGrowth7d: 260,
     comments: 11500,
     shares: 54000,
-    viralScore: 85,
     tags: ['逆齡', '台灣', '保養'],
     url: 'https://www.tiktok.com/search?q=%E5%8F%B0%E7%81%A3%E4%BF%9D%E9%A4%8A%E7%A7%98%E8%A8%A3'
   },
@@ -113,7 +107,6 @@ const VR_DATA = [
     viewsGrowth7d: 220,
     comments: 9800,
     shares: 56000,
-    viralScore: 82,
     tags: ['kbeauty', '祛斑', 'skincare'],
     url: 'https://www.facebook.com/search/videos/?q=han+quoc+serum+tri+nam'
   },
@@ -129,7 +122,6 @@ const VR_DATA = [
     viewsGrowth7d: 310,
     comments: 6700,
     shares: 29000,
-    viralScore: 80,
     tags: ['sontint', 'môi', 'makeup'],
     url: 'https://www.tiktok.com/search?q=son+tint+viral+2025'
   },
@@ -145,7 +137,6 @@ const VR_DATA = [
     viewsGrowth7d: 370,
     comments: 18200,
     shares: 87000,
-    viralScore: 93,
     tags: ['防晒', '美白', '护肤'],
     url: 'https://www.tiktok.com/search?q=%E9%98%B2%E6%99%92%E9%9C%9C%E6%8E%A8%E8%8D%90'
   },
@@ -161,7 +152,6 @@ const VR_DATA = [
     viewsGrowth7d: 190,
     comments: 4200,
     shares: 16000,
-    viralScore: 72,
     tags: ['trịnám', 'tànnhang', 'serum'],
     url: 'https://www.facebook.com/search/videos/?q=serum+tri+nam+tan+nhang'
   },
@@ -177,7 +167,6 @@ const VR_DATA = [
     viewsGrowth7d: 450,
     comments: 13500,
     shares: 78000,
-    viralScore: 92,
     tags: ['dadaumụn', 'skincare', 'tiếtkiệm'],
     url: 'https://www.tiktok.com/search?q=skincare+buoi+sang+da+dau+mun'
   },
@@ -193,7 +182,6 @@ const VR_DATA = [
     viewsGrowth7d: 200,
     comments: 6300,
     shares: 38000,
-    viralScore: 76,
     tags: ['抗老', '逆齡', '精華'],
     url: 'https://www.facebook.com/search/videos/?q=taiwan+anti+aging+skincare'
   },
@@ -209,7 +197,6 @@ const VR_DATA = [
     viewsGrowth7d: 480,
     comments: 17600,
     shares: 95000,
-    viralScore: 95,
     tags: ['스킨케어', '루틴', '피부'],
     url: 'https://www.tiktok.com/search?q=%EC%8A%A4%ED%82%A8%EC%BC%80%EC%96%B4+%EB%A3%A8%ED%8B%B4'
   },
@@ -225,7 +212,6 @@ const VR_DATA = [
     viewsGrowth7d: 430,
     comments: 21000,
     shares: 110000,
-    viralScore: 95,
     tags: ['祛斑', '美白', '精华'],
     url: 'https://www.facebook.com/search/videos/?q=%E7%A5%9B%E6%96%91%E7%BE%8E%E7%99%BD%E7%B2%BE%E5%8D%8E'
   },
@@ -241,7 +227,6 @@ const VR_DATA = [
     viewsGrowth7d: 295,
     comments: 13500,
     shares: 78000,
-    viralScore: 89,
     tags: ['dadep', 'makeup', 'nofilter'],
     url: 'https://www.tiktok.com/search?q=makeup+da+dep+no+filter'
   },
@@ -257,7 +242,6 @@ const VR_DATA = [
     viewsGrowth7d: 240,
     comments: 11200,
     shares: 67000,
-    viralScore: 84,
     tags: ['kbeauty', 'dualist', 'kemnguong'],
     url: 'https://www.facebook.com/search/videos/?q=kem+duong+han+quoc+review'
   },
@@ -273,7 +257,6 @@ const VR_DATA = [
     viewsGrowth7d: 210,
     comments: 7800,
     shares: 42000,
-    viralScore: 78,
     tags: ['台灣', '美妝', '開箱'],
     url: 'https://www.tiktok.com/search?q=%E5%8F%B0%E7%81%A3%E7%BE%8E%E5%A6%9D%E7%B2%BE%E8%8F%AF'
   },
@@ -289,7 +272,6 @@ const VR_DATA = [
     viewsGrowth7d: 160,
     comments: 3100,
     shares: 13000,
-    viralScore: 65,
     tags: ['xịtkhoáng', 'dưỡngẩm', 'dadau'],
     url: 'https://www.facebook.com/search/videos/?q=xit+khoang+duong+am+da+dau'
   },
@@ -305,7 +287,6 @@ const VR_DATA = [
     viewsGrowth7d: 560,
     comments: 28400,
     shares: 145000,
-    viralScore: 99,
     tags: ['护肤', '玻璃肌', '皮肤科'],
     url: 'https://www.tiktok.com/search?q=%E7%8E%BB%E7%92%83%E8%82%8C+%E6%8A%A4%E8%82%A4'
   },
@@ -321,7 +302,6 @@ const VR_DATA = [
     viewsGrowth7d: 175,
     comments: 5500,
     shares: 31000,
-    viralScore: 70,
     tags: ['台灣', '美白', '素顏'],
     url: 'https://www.facebook.com/search/videos/?q=%E5%8F%B0%E7%81%A3%E7%BE%8E%E7%99%BD%E7%B2%BE%E8%8F%AF'
   }

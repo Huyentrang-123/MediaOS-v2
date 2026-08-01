@@ -4,6 +4,30 @@
 
 'use strict';
 
+/* Dynamic score computed from engagement metrics normalized across the dataset.
+   Weights: growth 40%, share rate 25%, comment rate 20%, total views 15%. */
+function calculateViralScore(video, dataset) {
+  function normalize(val, arr) {
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+    if (max === min) return 1;
+    return (val - min) / (max - min);
+  }
+
+  const growths      = dataset.map(v => v.viewsGrowth7d);
+  const shareRates   = dataset.map(v => v.shares / v.views);
+  const commentRates = dataset.map(v => v.comments / v.views);
+  const views        = dataset.map(v => v.views);
+
+  const score =
+    0.40 * normalize(video.viewsGrowth7d,         growths)      +
+    0.25 * normalize(video.shares / video.views,  shareRates)   +
+    0.20 * normalize(video.comments / video.views, commentRates) +
+    0.15 * normalize(video.views,                 views);
+
+  return Math.round(score * 100);
+}
+
 function getScoreLabel(score) {
   if (score >= 95) return { label: '🔥 Bùng nổ',  cls: 'badge-error' };
   if (score >= 85) return { label: '📈 Viral mạnh', cls: 'badge-warning' };
