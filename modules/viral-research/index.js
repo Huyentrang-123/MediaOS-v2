@@ -9,20 +9,19 @@ function renderResearch(container) {
 
   container.innerHTML = `
     <div class="page-header">
-      <div class="page-title">🔍 Viral Research Hub</div>
-      <div class="page-subtitle">Khám phá video mỹ phẩm đang bùng nổ trên TikTok và Facebook trong 10 ngày gần nhất</div>
+      <div class="page-title">🔍 AI Viral Research Engine</div>
+      <div class="page-subtitle">Nhập từ khóa — AI tự động phân tích, đánh giá và chọn lọc những video đáng nghiên cứu nhất trên TikTok và Facebook</div>
     </div>
 
     ${buildStatsBar()}
-    ${buildPlatformLinks(fs)}
     ${buildFilterBar(fs)}
 
     <div class="section-header">
       <div class="section-title">
-        📹 Video đang viral
+        🏆 Top video đáng nghiên cứu nhất
         <span class="count-badge" id="vrCount">–</span>
       </div>
-      <div style="font-size:12px;color:var(--text-3)" id="vrSortLabel"></div>
+      <div style="font-size:12px;color:var(--text-3)" id="vrAiLabel"></div>
     </div>
 
     <div class="vr-grid" id="vrGrid"></div>
@@ -34,9 +33,9 @@ function renderResearch(container) {
 
 /* ---- Stats Bar ---- */
 function buildStatsBar() {
-  const total   = VR_DATA.length;
-  const tiktok  = VR_DATA.filter(v => v.platform === 'tiktok').length;
-  const fb      = VR_DATA.filter(v => v.platform === 'facebook').length;
+  const total    = VR_DATA.length;
+  const tiktok   = VR_DATA.filter(v => v.platform === 'tiktok').length;
+  const fb       = VR_DATA.filter(v => v.platform === 'facebook').length;
   const topScore = Math.max(...VR_DATA.map(v => v.viralScore));
 
   return `
@@ -72,21 +71,6 @@ function buildStatsBar() {
     </div>`;
 }
 
-/* ---- Platform Direct Links ---- */
-function buildPlatformLinks(fs) {
-  const q = encodeURIComponent('mỹ phẩm viral skincare');
-  return `
-    <div class="vr-platform-links">
-      <span class="vr-pl-label">🔗 Tìm trực tiếp:</span>
-      <a class="vr-pl-link tiktok" href="https://www.tiktok.com/search?q=${q}" target="_blank" rel="noopener">
-        ♪ TikTok Search
-      </a>
-      <a class="vr-pl-link facebook" href="https://www.facebook.com/search/videos/?q=${encodeURIComponent('skincare viral mỹ phẩm')}" target="_blank" rel="noopener">
-        f Facebook Videos
-      </a>
-    </div>`;
-}
-
 /* ---- Filter Bar ---- */
 function buildFilterBar(fs) {
   const platformChips = CONFIG.platforms.map(p => `
@@ -99,12 +83,16 @@ function buildFilterBar(fs) {
       ${r.label}
     </button>`).join('');
 
-  const sortOpts = CONFIG.sortOptions.map(s =>
-    `<option value="${s.id}" ${fs.sortBy === s.id ? 'selected' : ''}>${s.label}</option>`
-  ).join('');
-
   return `
     <div class="vr-filters">
+      <div class="vr-filter-row">
+        <div class="vr-search-box">
+          <input type="text" id="vrKeyword" class="vr-search-input"
+            placeholder="Nhập từ khóa: serum viral, kem nám, before after skincare, 美白精华..."
+            value="${esc(fs.keyword)}">
+          <button class="btn btn-primary" id="vrSearchBtn">🔍 Phân tích</button>
+        </div>
+      </div>
       <div class="vr-filter-row">
         <span class="vr-filter-label">NỀN TẢNG</span>
         <div class="chip-group" id="platformChips">${platformChips}</div>
@@ -112,10 +100,6 @@ function buildFilterBar(fs) {
       <div class="vr-filter-row">
         <span class="vr-filter-label">KHU VỰC</span>
         <div class="chip-group" id="regionChips">${regionChips}</div>
-        <div class="vr-filter-right">
-          <span style="font-size:12px;color:var(--text-3)">Sắp xếp:</span>
-          <select class="select" id="sortSelect">${sortOpts}</select>
-        </div>
       </div>
     </div>`;
 }
@@ -126,20 +110,28 @@ function renderGrid() {
   const results = applyFilters(VR_DATA, fs);
   const grid    = $('#vrGrid');
   const countEl = $('#vrCount');
-  const sortEl  = $('#vrSortLabel');
+  const aiLabel = $('#vrAiLabel');
 
   if (countEl) countEl.textContent = results.length;
-  if (sortEl) {
-    const label = CONFIG.sortOptions.find(s => s.id === fs.sortBy);
-    sortEl.textContent = label ? `Sắp xếp: ${label.label}` : '';
+  if (aiLabel) {
+    aiLabel.textContent = results.length > 0
+      ? `AI đã phân tích ${VR_DATA.length} video — hiển thị ${results.length} video đáng nghiên cứu nhất`
+      : '';
   }
 
-  if (!results.length) {
+  if (results.length === 0) {
+    const isEmpty = !fs.keyword && fs.platform === 'all' && fs.region === 'global';
     grid.innerHTML = `
       <div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-title">Không có video phù hợp</div>
-        <div class="empty-desc">Thử thay đổi bộ lọc nền tảng hoặc khu vực.</div>
+        <div class="empty-icon">${isEmpty ? '🤖' : '🔍'}</div>
+        <div class="empty-title">${isEmpty
+          ? 'Nhập từ khóa để AI bắt đầu phân tích'
+          : 'Không tìm thấy video phù hợp'
+        }</div>
+        <div class="empty-desc">${isEmpty
+          ? 'Gõ từ khóa mỹ phẩm bạn muốn nghiên cứu, chọn nền tảng và khu vực, rồi bấm Phân tích.'
+          : 'Thử đổi từ khóa hoặc mở rộng khu vực / nền tảng.'
+        }</div>
       </div>`;
     return;
   }
@@ -150,30 +142,43 @@ function renderGrid() {
 
 /* ---- Events ---- */
 function bindFilterEvents() {
-  /* Platform chips */
+  const doSearch = () => {
+    const input = $('#vrKeyword');
+    if (input) state.viralResearch.keyword = input.value;
+    renderGrid();
+  };
+
+  /* Search button */
+  const searchBtn = $('#vrSearchBtn');
+  if (searchBtn) searchBtn.addEventListener('click', doSearch);
+
+  /* Enter key on search input */
+  const input = $('#vrKeyword');
+  if (input) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSearch();
+    });
+  }
+
+  /* Platform chips — trigger immediately */
   $$('#platformChips .chip').forEach(chip => {
     chip.addEventListener('click', () => {
       state.viralResearch.platform = chip.dataset.platform;
-      $$('#platformChips .chip').forEach(c => c.classList.toggle('active', c.dataset.platform === chip.dataset.platform));
+      $$('#platformChips .chip').forEach(c =>
+        c.classList.toggle('active', c.dataset.platform === chip.dataset.platform)
+      );
       renderGrid();
     });
   });
 
-  /* Region chips */
+  /* Region chips — trigger immediately */
   $$('#regionChips .chip').forEach(chip => {
     chip.addEventListener('click', () => {
       state.viralResearch.region = chip.dataset.region;
-      $$('#regionChips .chip').forEach(c => c.classList.toggle('active', c.dataset.region === chip.dataset.region));
+      $$('#regionChips .chip').forEach(c =>
+        c.classList.toggle('active', c.dataset.region === chip.dataset.region)
+      );
       renderGrid();
     });
   });
-
-  /* Sort select */
-  const sortSel = $('#sortSelect');
-  if (sortSel) {
-    sortSel.addEventListener('change', () => {
-      state.viralResearch.sortBy = sortSel.value;
-      renderGrid();
-    });
-  }
 }

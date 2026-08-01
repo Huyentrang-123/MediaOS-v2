@@ -11,7 +11,7 @@ const state = {
   viralResearch: {
     platform: 'all',
     region:   'global',
-    sortBy:   'viral_score',
+    keyword:  '',
     saved:    []
   }
 };

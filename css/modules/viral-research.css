@@ -317,6 +317,26 @@
   color: var(--primary);
 }
 
+/* ---- Search Box ---- */
+.vr-search-box {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.vr-search-input {
+  flex: 1;
+  padding: 9px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: 13px;
+  transition: border-color var(--t);
+}
+.vr-search-input::placeholder { color: var(--text-3); }
+.vr-search-input:focus { outline: none; border-color: var(--primary); }
+
 /* ---- Platform Direct Links ---- */
 .vr-platform-links {
   background: var(--surface);

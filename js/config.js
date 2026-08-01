@@ -21,20 +21,11 @@ const CONFIG = {
     { id: 'tw',     label: '🇹🇼 Đài Loan',  flag: '🇹🇼' }
   ],
 
-  sortOptions: [
-    { id: 'viral_score', label: '🔥 Viral Score' },
-    { id: 'growth',      label: '📈 Tăng trưởng 7 ngày' },
-    { id: 'views',       label: '👁️ Nhiều view nhất' },
-    { id: 'comments',    label: '💬 Nhiều bình luận' },
-    { id: 'shares',      label: '🔗 Nhiều chia sẻ' }
-  ],
-
   pageNames: {
     research:   'Viral Research',
-    trends:     'Trend Analysis',
-    knowledge:  'Knowledge Base',
     campaigns:  'Campaigns',
     ideas:      'Ideas Board',
+    aiwriter:   'AI Content Writer',
     team:       'Team',
     guidelines: 'Guidelines & SOP'
   }
