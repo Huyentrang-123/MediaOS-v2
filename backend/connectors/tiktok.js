@@ -76,11 +76,11 @@ function normalizeVideo(raw) {
       ? new Date(raw.create_time * 1000).toISOString()
       : null;
 
-    /* views per hour since posting — proxy for velocity when no history */
+    /* Average views per hour since posting — NOT recent growth, just a time-adjusted reach signal */
     const hoursOld = postedAt
       ? Math.max(1, (Date.now() - new Date(postedAt).getTime()) / 3_600_000)
       : null;
-    const velocityScore = hoursOld ? views / hoursOld : null;
+    const viewsPerHour = hoursOld ? views / hoursOld : null;
 
     return {
       id:            `tiktok:${videoId}`,
@@ -100,7 +100,7 @@ function normalizeVideo(raw) {
       hashtags:      (raw.text_extra || [])
                        .filter(t => t.hashtag_name)
                        .map(t => t.hashtag_name),
-      velocityScore,
+      viewsPerHour,
       /* Raw field kept for debugging */
       _raw:          undefined
     };

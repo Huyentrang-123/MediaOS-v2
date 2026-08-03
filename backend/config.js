@@ -11,12 +11,16 @@ module.exports = {
     baseUrl: 'https://api.tikhub.io'
   },
 
-  /* Viral score weights — same formula as frontend */
+  /*
+   * Viral score weights (Phase 1 — no historical growth data).
+   * shareRate + commentRate dominate so old popular videos aren't penalized.
+   * viewsPerHour = totalViews/totalHours (since posting), not recent growth.
+   */
   scoreWeights: {
-    growth:      0.40,
-    shareRate:   0.25,
-    commentRate: 0.20,
-    views:       0.15
+    shareRate:    0.35,
+    commentRate:  0.30,
+    views:        0.25,
+    viewsPerHour: 0.10
   },
 
   /* Minimum viral score (0–100) to include in results */

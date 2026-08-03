@@ -12,40 +12,34 @@ function normalize(val, arr) {
 }
 
 /*
- * Score all videos in a batch against each other (min-max normalization).
- * Also pulls growth data from DB when available.
- *
- * Returns the same array with `viralScore` (0–100) and `growthRate` added.
+ * Score all videos in a batch (min-max normalization within the batch).
+ * Phase 1: no historical snapshots — scores based on engagement rates and reach.
+ * Returns the same array with `viralScore` (0–100) and `growthRate: null` added.
  */
 async function scoreVideos(videos) {
   if (!videos.length) return [];
 
-  /* Phase 1: use velocityScore (views/hour) as growth proxy — no DB yet */
-  const enriched = videos.map(v => ({
+  /* Derive engagement rates + carry viewsPerHour as a minor recency signal */
+  const withRates = videos.map(v => ({
     ...v,
     growthRate:  null,
-    growthProxy: v.velocityScore || 0
-  }));
-
-  /* Derive rates */
-  const withRates = enriched.map(v => ({
-    ...v,
     shareRate:   v.views > 0 ? v.shares   / v.views : 0,
-    commentRate: v.views > 0 ? v.comments / v.views : 0
+    commentRate: v.views > 0 ? v.comments / v.views : 0,
+    viewsPerHour: v.viewsPerHour || 0
   }));
 
   /* Build arrays for normalization */
-  const growths      = withRates.map(v => v.growthProxy);
-  const shareRates   = withRates.map(v => v.shareRate);
-  const commentRates = withRates.map(v => v.commentRate);
-  const viewCounts   = withRates.map(v => v.views);
+  const shareRates     = withRates.map(v => v.shareRate);
+  const commentRates   = withRates.map(v => v.commentRate);
+  const viewCounts     = withRates.map(v => v.views);
+  const viewsPerHourArr = withRates.map(v => v.viewsPerHour);
 
   return withRates.map(v => {
     const score =
-      W.growth      * normalize(v.growthProxy,   growths)      +
-      W.shareRate   * normalize(v.shareRate,      shareRates)   +
-      W.commentRate * normalize(v.commentRate,    commentRates) +
-      W.views       * normalize(v.views,          viewCounts);
+      W.shareRate    * normalize(v.shareRate,    shareRates)     +
+      W.commentRate  * normalize(v.commentRate,  commentRates)   +
+      W.views        * normalize(v.views,        viewCounts)     +
+      W.viewsPerHour * normalize(v.viewsPerHour, viewsPerHourArr);
 
     return {
       ...v,
