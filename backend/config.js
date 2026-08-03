@@ -1,10 +1,9 @@
 'use strict';
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 module.exports = {
-  port:           parseInt(process.env.PORT || '3001', 10),
-  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5500',
+  port: parseInt(process.env.PORT || '3001', 10),
 
   tikhub: {
     apiKey:  process.env.TIKHUB_API_KEY || '',
@@ -23,9 +22,6 @@ module.exports = {
     viewsPerHour: 0.10
   },
 
-  /* Minimum viral score (0–100) to include in results */
   minViralScore: 30,
-
-  /* Max results returned per search */
-  maxResults: 30
+  maxResults:    30
 };

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: mediaos
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: TIKHUB_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production

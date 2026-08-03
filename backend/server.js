@@ -1,14 +1,17 @@
 'use strict';
 
+const path    = require('path');
 const express = require('express');
-const cors    = require('cors');
 const config  = require('./config');
 
 const researchRouter = require('./routes/research');
 
-const app = express();
+const app    = express();
+const PUBLIC = path.join(__dirname, '..');
 
-app.use(cors({ origin: config.frontendOrigin }));
+/* Serve all frontend static files (css/, js/, modules/, index.html) */
+app.use(express.static(PUBLIC));
+
 app.use(express.json());
 
 /* Health check */
@@ -29,9 +32,14 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
+/* SPA fallback — serve index.html for any non-API GET */
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(PUBLIC, 'index.html'));
+});
+
 app.listen(config.port, () => {
-  console.log(`MediaOS backend running on http://localhost:${config.port}`);
+  console.log(`MediaOS running on http://localhost:${config.port}`);
   if (!config.tikhub.apiKey) {
-    console.warn('WARNING: TIKHUB_API_KEY is not set. Add it to backend/.env');
+    console.warn('WARNING: TIKHUB_API_KEY is not set');
   }
 });
