@@ -1,0 +1,12 @@
+{
+  "name": "mediaos",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others --names \"backend,frontend\" --prefix-colors \"cyan,green\" \"npm --prefix backend run dev\" \"http-server . -p 5500 -c-1\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "http-server": "^14.1.1"
+  }
+}

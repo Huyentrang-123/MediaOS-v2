@@ -22,6 +22,7 @@ function apiVideoToCard(v) {
     creator:       v.creatorHandle || v.creator || '',
     postedDate:    v.postedAt  ? v.postedAt.slice(0, 10) : '',
     views:         v.stats?.views    || 0,
+    likes:         v.stats?.likes    || 0,
     comments:      v.stats?.comments || 0,
     shares:        v.stats?.shares   || 0,
     viewsGrowth7d: gr ? parseFloat(gr) : null,
@@ -163,15 +164,15 @@ async function renderGrid(triggerSearch = false) {
     /* Phase 1: Facebook connector not yet implemented — fall back to TikTok */
     const platform = (fs.platform === 'all' || fs.platform === 'facebook')
       ? 'tiktok' : fs.platform;
-    const platformLabel = fs.platform === 'facebook'
-      ? 'TikTok (Facebook sẽ có trong Phase 2)'
-      : 'TikTok';
+
+    const searchBtn = $('#vrSearchBtn');
+    if (searchBtn) { searchBtn.disabled = true; searchBtn.textContent = '⏳ Đang phân tích...'; }
 
     grid.innerHTML = `
       <div class="empty-state" style="grid-column:1/-1">
         <div class="empty-icon">⏳</div>
-        <div class="empty-title">AI đang phân tích...</div>
-        <div class="empty-desc">Đang thu thập và đánh giá video từ ${platformLabel}</div>
+        <div class="empty-title">MediaOS đang phân tích video TikTok...</div>
+        <div class="empty-desc">Đang thu thập và xếp hạng video với từ khóa <strong>${esc(fs.keyword.trim())}</strong></div>
       </div>`;
 
     try {
@@ -191,18 +192,21 @@ async function renderGrid(triggerSearch = false) {
     } catch (err) {
       console.error('[VR] Backend error:', err);
       _searchState = 'error';
+      _updateGridMeta(0, 0);
       grid.innerHTML = `
         <div class="empty-state" style="grid-column:1/-1">
           <div class="empty-icon">⚠️</div>
           <div class="empty-title">Không thể kết nối đến backend</div>
           <div class="empty-desc">
             ${esc(err.message)}<br>
-            Đảm bảo backend đang chạy: <code>cd backend && npm run dev</code>
+            Đảm bảo backend đang chạy: <code>npm run dev</code>
           </div>
         </div>`;
-      _updateGridMeta(0, 0);
-      return;
+    } finally {
+      if (searchBtn) { searchBtn.disabled = false; searchBtn.textContent = '🔍 Phân tích'; }
     }
+
+    if (_searchState === 'error') return;
   }
 
   /* Keyword present but no search yet */
@@ -239,7 +243,7 @@ async function renderGrid(triggerSearch = false) {
       <div class="empty-state" style="grid-column:1/-1">
         <div class="empty-icon">🔍</div>
         <div class="empty-title">Không tìm thấy video phù hợp</div>
-        <div class="empty-desc">Thử đổi từ khóa hoặc mở rộng khu vực / nền tảng.</div>
+        <div class="empty-desc">Hãy thử từ khóa hoặc khu vực khác.</div>
       </div>`;
     return;
   }

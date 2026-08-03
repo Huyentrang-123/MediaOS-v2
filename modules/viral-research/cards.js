@@ -49,6 +49,7 @@ function renderVideoCard(video) {
 
         <div class="vr-stats">
           <span class="vr-stat">👁️ ${formatNumber(video.views)}</span>
+          <span class="vr-stat">❤️ ${formatNumber(video.likes)}</span>
           <span class="vr-stat">💬 ${formatNumber(video.comments)}</span>
           <span class="vr-stat">🔗 ${formatNumber(video.shares)}</span>
           ${video.viewsGrowth7d != null
