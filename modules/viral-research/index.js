@@ -4,6 +4,33 @@
 
 'use strict';
 
+const BACKEND_URL = 'http://localhost:3001';
+
+/* Module-level state for API results */
+let _apiResults  = [];
+let _searchState = 'idle'; // 'idle' | 'loading' | 'done' | 'error'
+
+/* Map backend response to renderVideoCard() format */
+function apiVideoToCard(v) {
+  const gr = v.stats?.growthRate;
+  return {
+    id:            v.id,
+    platform:      v.platform,
+    region:        v.region    || '',
+    title:         v.caption   || '(Không có tiêu đề)',
+    thumbnail:     v.thumbnail || '',
+    creator:       v.creatorHandle || v.creator || '',
+    postedDate:    v.postedAt  ? v.postedAt.slice(0, 10) : '',
+    views:         v.stats?.views    || 0,
+    comments:      v.stats?.comments || 0,
+    shares:        v.stats?.shares   || 0,
+    viewsGrowth7d: gr ? parseFloat(gr) : null,
+    viralScore:    v.viral?.score    || 0,
+    tags:          v.hashtags        || [],
+    url:           v.url             || '#'
+  };
+}
+
 function renderResearch(container) {
   const fs = state.viralResearch;
 
@@ -105,33 +132,114 @@ function buildFilterBar(fs) {
 }
 
 /* ---- Grid Render ---- */
-function renderGrid() {
-  const fs      = state.viralResearch;
-  const results = applyFilters(VR_DATA, fs);
-  const grid    = $('#vrGrid');
-  const countEl = $('#vrCount');
-  const aiLabel = $('#vrAiLabel');
+async function renderGrid(triggerSearch = false) {
+  const fs   = state.viralResearch;
+  const grid = $('#vrGrid');
+  if (!grid) return;
 
-  if (countEl) countEl.textContent = results.length;
-  if (aiLabel) {
-    aiLabel.textContent = results.length > 0
-      ? `AI đã phân tích ${VR_DATA.length} video — hiển thị ${results.length} video đáng nghiên cứu nhất`
-      : '';
-  }
-
-  if (results.length === 0) {
-    const isEmpty = !fs.keyword && fs.platform === 'all' && fs.region === 'global';
+  /* No keyword → reset, show prompt */
+  if (!fs.keyword || !fs.keyword.trim()) {
+    _apiResults  = [];
+    _searchState = 'idle';
+    _updateGridMeta(0, 0);
     grid.innerHTML = `
       <div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-icon">${isEmpty ? '🤖' : '🔍'}</div>
-        <div class="empty-title">${isEmpty
-          ? 'Nhập từ khóa để AI bắt đầu phân tích'
-          : 'Không tìm thấy video phù hợp'
-        }</div>
-        <div class="empty-desc">${isEmpty
-          ? 'Gõ từ khóa mỹ phẩm bạn muốn nghiên cứu, chọn nền tảng và khu vực, rồi bấm Phân tích.'
-          : 'Thử đổi từ khóa hoặc mở rộng khu vực / nền tảng.'
-        }</div>
+        <div class="empty-icon">🤖</div>
+        <div class="empty-title">Nhập từ khóa để AI bắt đầu phân tích</div>
+        <div class="empty-desc">Gõ từ khóa mỹ phẩm bạn muốn nghiên cứu, chọn nền tảng và khu vực, rồi bấm Phân tích.</div>
+      </div>`;
+    return;
+  }
+
+  /* Ignore chip changes while a fetch is in progress */
+  if (_searchState === 'loading' && !triggerSearch) return;
+
+  /* Fetch from backend when explicitly triggered */
+  if (triggerSearch) {
+    if (_searchState === 'loading') return;
+    _searchState = 'loading';
+    _apiResults  = [];
+
+    /* Phase 1: Facebook connector not yet implemented — fall back to TikTok */
+    const platform = (fs.platform === 'all' || fs.platform === 'facebook')
+      ? 'tiktok' : fs.platform;
+    const platformLabel = fs.platform === 'facebook'
+      ? 'TikTok (Facebook sẽ có trong Phase 2)'
+      : 'TikTok';
+
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon">⏳</div>
+        <div class="empty-title">AI đang phân tích...</div>
+        <div class="empty-desc">Đang thu thập và đánh giá video từ ${platformLabel}</div>
+      </div>`;
+
+    try {
+      const params = new URLSearchParams({
+        keyword:  fs.keyword.trim(),
+        platform,
+        region:   fs.region
+      });
+      const resp = await fetch(`${BACKEND_URL}/api/research?${params}`);
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        throw new Error(e.error || `HTTP ${resp.status}`);
+      }
+      const json   = await resp.json();
+      _apiResults  = (json.data || []).map(apiVideoToCard);
+      _searchState = 'done';
+    } catch (err) {
+      console.error('[VR] Backend error:', err);
+      _searchState = 'error';
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-icon">⚠️</div>
+          <div class="empty-title">Không thể kết nối đến backend</div>
+          <div class="empty-desc">
+            ${esc(err.message)}<br>
+            Đảm bảo backend đang chạy: <code>cd backend && npm run dev</code>
+          </div>
+        </div>`;
+      _updateGridMeta(0, 0);
+      return;
+    }
+  }
+
+  /* Keyword present but no search yet */
+  if (_searchState === 'idle') {
+    _updateGridMeta(0, 0);
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">Bấm "Phân tích" để bắt đầu</div>
+        <div class="empty-desc">AI sẽ tìm kiếm và phân tích video với từ khóa <strong>${esc(fs.keyword)}</strong></div>
+      </div>`;
+    return;
+  }
+
+  /* Keep error state visible when chips change (don't replace with nothing) */
+  if (_searchState === 'error') {
+    _updateGridMeta(0, 0);
+    return;
+  }
+
+  /* _searchState === 'done' — client-side filter on cached results */
+  let results = _apiResults.slice();
+  if (fs.platform !== 'all') {
+    results = results.filter(v => v.platform === fs.platform);
+  }
+  if (fs.region !== 'global') {
+    results = results.filter(v => v.region === fs.region);
+  }
+
+  _updateGridMeta(results.length, _apiResults.length);
+
+  if (results.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">Không tìm thấy video phù hợp</div>
+        <div class="empty-desc">Thử đổi từ khóa hoặc mở rộng khu vực / nền tảng.</div>
       </div>`;
     return;
   }
@@ -140,19 +248,31 @@ function renderGrid() {
   attachCardHandlers(grid);
 }
 
+function _updateGridMeta(shown, total) {
+  const countEl = $('#vrCount');
+  const aiLabel = $('#vrAiLabel');
+  if (countEl) countEl.textContent = shown > 0 ? shown : '–';
+  if (aiLabel) {
+    aiLabel.textContent = total > 0
+      ? `AI đã phân tích ${total} video — hiển thị ${shown} video đáng nghiên cứu nhất`
+      : '';
+  }
+}
+
 /* ---- Events ---- */
 function bindFilterEvents() {
   const doSearch = () => {
     const input = $('#vrKeyword');
-    if (input) state.viralResearch.keyword = input.value;
-    renderGrid();
+    if (input) {
+      state.viralResearch.keyword = input.value;
+      saveState();
+    }
+    renderGrid(true);
   };
 
-  /* Search button */
   const searchBtn = $('#vrSearchBtn');
   if (searchBtn) searchBtn.addEventListener('click', doSearch);
 
-  /* Enter key on search input */
   const input = $('#vrKeyword');
   if (input) {
     input.addEventListener('keydown', e => {
@@ -160,25 +280,25 @@ function bindFilterEvents() {
     });
   }
 
-  /* Platform chips — trigger immediately */
+  /* Platform chips — filter cached results immediately, no re-fetch */
   $$('#platformChips .chip').forEach(chip => {
     chip.addEventListener('click', () => {
       state.viralResearch.platform = chip.dataset.platform;
       $$('#platformChips .chip').forEach(c =>
         c.classList.toggle('active', c.dataset.platform === chip.dataset.platform)
       );
-      renderGrid();
+      renderGrid(false);
     });
   });
 
-  /* Region chips — trigger immediately */
+  /* Region chips — filter cached results immediately, no re-fetch */
   $$('#regionChips .chip').forEach(chip => {
     chip.addEventListener('click', () => {
       state.viralResearch.region = chip.dataset.region;
       $$('#regionChips .chip').forEach(c =>
         c.classList.toggle('active', c.dataset.region === chip.dataset.region)
       );
-      renderGrid();
+      renderGrid(false);
     });
   });
 }

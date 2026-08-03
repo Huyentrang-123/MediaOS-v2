@@ -51,7 +51,9 @@ function renderVideoCard(video) {
           <span class="vr-stat">👁️ ${formatNumber(video.views)}</span>
           <span class="vr-stat">💬 ${formatNumber(video.comments)}</span>
           <span class="vr-stat">🔗 ${formatNumber(video.shares)}</span>
-          <span class="vr-growth">📈 +${video.viewsGrowth7d}% / 7 ngày</span>
+          ${video.viewsGrowth7d != null
+            ? `<span class="vr-growth">📈 +${video.viewsGrowth7d}% / 7 ngày</span>`
+            : ''}
         </div>
 
         <span class="badge ${scoreInfo.cls}" style="align-self:flex-start">${scoreInfo.label}</span>
