@@ -1,140 +1,159 @@
 # MediaOS v2 — Project Status
 
-**Cập nhật lần cuối:** 2026-08-01  
+**Cập nhật lần cuối:** 2026-08-03  
 **Repository:** `huyentrang-123/mediaos-v2`  
-**Branch đang phát triển:** `claude/mediaos-viral-research-359eio`
+**Branch đang phát triển:** `claude/mediaos-viral-research-359eio`  
+**Commit mới nhất:** `f096367` — feat: Deploy-ready — single server, Render config, relative API paths
 
 ---
 
 ## Tiến độ tổng quan
 
 ```
-[██████████████████░░░░░░░░] ~35% hoàn thành
+[████████████████████░░░░░░] ~50% hoàn thành
 ```
 
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
-| Giai đoạn 1 | Kiến trúc + Module Viral Research | ✅ Hoàn thành |
+| Frontend + UI | Kiến trúc + Module Viral Research | ✅ Hoàn thành |
+| Backend Phase 1 | TikHub API + Viral Score in-memory | ✅ Hoàn thành |
+| Deploy | Cấu hình Render (single server) | ✅ Sẵn sàng — chưa deploy thật |
 | Giai đoạn 2 | Campaigns, Ideas Board, AI Content Writer | ⏳ Chưa bắt đầu |
 | Giai đoạn 3 | Team, Guidelines & SOP | ⏳ Chưa bắt đầu |
-| Backend | Tích hợp API dữ liệu thật | ⏳ Chưa bắt đầu |
+| Backend Phase 2 | Facebook connector, DB snapshot, 7-day growth | ⏳ Chưa bắt đầu |
 
 ---
 
-## Đã hoàn thành
+## Đã hoàn thành — toàn bộ session
 
-### Commit 1 — Khởi tạo kiến trúc + Module Viral Research (`f8bc55f`)
+### Commits trong session này (thứ tự từ cũ đến mới)
 
-**Cấu trúc file:**
+| Commit | Nội dung |
+|---|---|
+| `f8bc55f` | Khởi tạo kiến trúc + Module Viral Research (UI, mock data, dynamic score) |
+| `142e546` | Cập nhật module list, chuyển sang AI Engine UX |
+| `5badbe8` | Dynamic Viral Score Formula (min-max normalization) |
+| `9392b26` | PROJECT_STATUS.md lần đầu |
+| `f28d34e` | Backend MVP Phase 1 — TikHub connector, Express server, routes |
+| `6154545` | Xóa DB khỏi luồng chính — Phase 1 stateless |
+| `96e7778` | Đổi tên velocityScore → viewsPerHour, điều chỉnh weights |
+| `e4cf3cf` | Thêm likes vào card, loading/error state, one-command startup |
+| `105c006` | Xóa better-sqlite3 — tương thích Node 24 |
+| `f096367` | **Deploy-ready** — single server, Render config, relative API paths |
+
+---
+
+## Cấu trúc hiện tại
+
 ```
-mediaos-v2/
+mediaos-v2/                   ← root, cũng là thư mục frontend
 ├── index.html
 ├── css/
-│   ├── variables.css     — Design tokens (brand colors, spacing, radius)
-│   ├── base.css          — Reset + scrollbar
-│   ├── layout.css        — Sidebar, topbar, main content
-│   ├── components.css    — Btn, chip, badge, card, modal, toast
-│   └── modules/
-│       └── viral-research.css
 ├── js/
-│   ├── utils/
-│   │   ├── dom.js        — $(), $$(), esc()
-│   │   ├── format.js     — formatNumber(), timeAgo(), formatDate()
-│   │   └── toast.js      — toast()
-│   ├── config.js         — CONFIG (platforms, regions, pageNames)
-│   ├── state.js          — state + loadState/saveState
-│   ├── router.js         — registerPage(), navigate()
-│   └── app.js            — DOMContentLoaded, theme, sidebar, nav
-└── modules/
-    └── viral-research/
-        ├── data.js       — VR_DATA (20 mock videos)
-        ├── viral-score.js — getScoreLabel(), generateViralReason(), calculateViralScore()
-        ├── filters.js    — applyFilters()
-        ├── cards.js      — renderVideoCard(), attachCardHandlers()
-        └── index.js      — renderResearch() và các hàm build/render
+├── modules/
+│   └── viral-research/
+│       ├── index.js          ← BACKEND_URL = '' (relative /api/research)
+│       ├── cards.js          ← hiển thị views, likes, comments, shares
+│       ├── data.js
+│       ├── filters.js
+│       └── viral-score.js
+├── package.json              ← root: start/dev scripts + tất cả deps
+├── render.yaml               ← Render deploy config
+├── .gitignore
+└── backend/
+    ├── server.js             ← serve static từ ../, không còn CORS middleware
+    ├── config.js             ← dotenv từ backend/.env, PORT từ env var
+    ├── connectors/
+    │   ├── tiktok.js         ← TikHub API, trả viewsPerHour
+    │   └── facebook.js       ← placeholder Phase 2
+    ├── routes/
+    │   └── research.js
+    ├── services/
+    │   ├── search.js         ← fetch → score → filter → return JSON
+    │   └── viral-score.js    ← scoring (shareRate 35%, commentRate 30%, views 25%, viewsPerHour 10%)
+    └── .env.example
 ```
-
-**Tính năng Viral Research:**
-- Hiển thị 20 video mẫu (TikTok + Facebook, 4 khu vực: VN, KR, CN, TW)
-- Bộ lọc: nền tảng (chips), khu vực (chips), từ khóa (search box)
-- Card video: thumbnail, platform badge, viral score badge, trending badge, stats, "why viral" accordion
-- Lưu video vào danh sách
 
 ---
 
-### Commit 2 — Cập nhật module list + AI Engine UX (`142e546`)
+## Chi tiết Backend Phase 1
 
-- Xóa Trend Analysis và Knowledge Base khỏi sidebar
-- Thêm AI Content Writer vào sidebar (section NỘI DUNG)
-- Chuyển Viral Research từ "bộ lọc thủ công" sang "AI Viral Research Engine":
-  - Thêm ô tìm kiếm từ khóa + nút "🔍 Phân tích"
-  - Xóa sort select (AI tự động xếp theo viral score)
-  - Header mới: "🏆 Top video đáng nghiên cứu nhất"
-  - Label: "AI đã phân tích X video — hiển thị Y video đáng nghiên cứu nhất"
-  - Empty state có 2 variant: chưa nhập từ khóa / không có kết quả
+**Luồng dữ liệu:**
+```
+User nhập keyword
+  → GET /api/research?keyword=...&platform=tiktok&region=vn
+  → connectors/tiktok.js: gọi TikHub API → video thật
+  → services/viral-score.js: normalize in-memory → viralScore 0–100
+  → lọc viralScore >= 30, sort desc, top 30
+  → frontend render card thật
+```
+
+**Scoring weights (Phase 1):**
+- `shareRate` (shares/views): 35%
+- `commentRate` (comments/views): 30%
+- `views` (tổng): 25%
+- `viewsPerHour` (views/giờ kể từ ngày đăng): 10%
+
+**Không có:** mock fallback, database, 7-day growth, Facebook (Phase 2)
 
 ---
 
-### Commit 3 — Dynamic Viral Score Formula (`5badbe8`)
+## Trạng thái Deploy lên Render
 
-Thay thế `viralScore` hardcode bằng công thức tính động:
+**Đã chuẩn bị — chưa deploy thật.** Cấu hình đã sẵn sàng:
 
-```
-viral_score = 0.40 × normalize(viewsGrowth7d)
-            + 0.25 × normalize(share_rate)       ← shares / views
-            + 0.20 × normalize(comment_rate)     ← comments / views
-            + 0.15 × normalize(total_views)
-```
+| | |
+|---|---|
+| **Build Command** | `npm install` |
+| **Start Command** | `npm start` |
+| **Biến môi trường** | `TIKHUB_API_KEY` (thêm trong Render dashboard) |
 
-- Mỗi metric được normalize 0–1 trong dataset (min-max scaling)
-- Score cuối nhân 100 → thang điểm 0–100
-- Xóa toàn bộ `viralScore` hardcode khỏi 20 video trong `data.js`
-- `filters.js` enrich từng video với score tính động trước khi sort
-- `index.js` stats bar tính topScore động
+`render.yaml` đã có trong repo — Render sẽ tự đọc khi connect repo.
+
+**Để deploy:**
+1. Render.com → New Web Service → connect `huyentrang-123/MediaOS-v2`
+2. Chọn branch `claude/mediaos-viral-research-359eio`
+3. Render tự đọc `render.yaml`
+4. Thêm `TIKHUB_API_KEY` trong tab Environment
+5. Deploy
 
 ---
 
 ## Còn dang dở
 
+### Cần làm trước khi dùng được
+- [ ] **Deploy lên Render + thêm TIKHUB_API_KEY** — app đã sẵn sàng, chỉ cần bước này
+- [ ] **Kiểm tra TikHub API** với keyword thật sau khi có key — verify video trả về đủ fields
+
 ### Module Viral Research
-- [ ] Viral score `getScoreLabel()` threshold hiện dùng: ≥95 Bùng nổ / ≥85 Viral mạnh / ≥70 Đang trend. Cần kiểm tra phân phối thực tế với công thức mới để điều chỉnh ngưỡng nếu cần.
-- [ ] Tính năng "Saved videos" — hiện save vào state nhưng chưa có trang xem danh sách đã lưu.
+- [ ] Tính năng "Saved videos" — hiện save vào `state` nhưng chưa có trang xem danh sách
+- [ ] Facebook connector (Phase 2) — `connectors/facebook.js` là placeholder
 
 ### Giai đoạn 2 — Module NỘI DUNG (chưa bắt đầu)
-- [ ] **Campaigns** (`#campaigns`) — quản lý chiến dịch content
-- [ ] **Ideas Board** (`#ideas`) — board ý tưởng nội dung
-- [ ] **AI Content Writer** (`#aiwriter`) — viết nội dung hỗ trợ AI (hiện chỉ có nav item, bấm vào hiển thị "Module đang phát triển")
+- [ ] **Campaigns** (`#campaigns`)
+- [ ] **Ideas Board** (`#ideas`)
+- [ ] **AI Content Writer** (`#aiwriter`) — nav item có sẵn, cần build UI
 
 ### Giai đoạn 3 — Module QUẢN LÝ (chưa bắt đầu)
-- [ ] **Team** (`#team`) — quản lý thành viên
-- [ ] **Guidelines & SOP** (`#guidelines`) — tài liệu quy trình
-
-### Tích hợp dữ liệu thật (chưa bắt đầu)
-Hiện tại toàn bộ data là mock. Ba hướng đã được nghiên cứu:
-
-| Giai đoạn | Giải pháp | Chi phí | Timeline |
-|---|---|---|---|
-| MVP hiện tại | Mock data + dynamic formula | $0 | ✅ Xong |
-| Phase 2 | RapidAPI TikTok Scraper + Apify Facebook + Node.js backend | $30–80/tháng | 2–4 tuần |
-| Phase 3 | TikTok Research API (chính thức) + custom crawler + PostgreSQL | $100–300/tháng | 2–3 tháng |
-
-**Lưu ý quan trọng:**
-- Meta Graph API **không thể** search video public theo keyword (giới hạn từ 2018)
-- Growth rate 7 ngày không lấy được từ 1 API call — cần crawl nhiều lần theo thời gian
-- TikTok Research API chỉ có data US + EU, không có VN/CN/KR/TW riêng biệt
+- [ ] **Team** (`#team`)
+- [ ] **Guidelines & SOP** (`#guidelines`)
 
 ---
 
-## Bước tiếp theo đề xuất
+## Bước tiếp theo chính xác khi bắt đầu phiên mới
 
-**Ngắn hạn (MVP):**
-1. Kiểm tra ngưỡng score label (`getScoreLabel`) với distribution mới từ công thức động
-2. Mở rộng mock dataset từ 20 → 40–50 video để tìm kiếm từ khóa có ý nghĩa hơn
+**Ưu tiên 1 — Để app hoạt động thật:**
+1. Deploy lên Render (xem hướng dẫn ở trên)
+2. Thêm `TIKHUB_API_KEY` trong Render dashboard
+3. Test: mở URL Render → nhập keyword → bấm Phân tích → kiểm tra video trả về
 
-**Trung hạn (Giai đoạn 2):**
-3. Bắt đầu build module **Campaigns** hoặc **Ideas Board** — chờ xác nhận thứ tự ưu tiên
-4. Quyết định kiến trúc dữ liệu thật (RapidAPI vs TikTok Research API) trước khi build backend
+**Ưu tiên 2 — Nếu Render đã chạy ổn:**
+4. Kiểm tra `backend/.env.example` → tạo `backend/.env` cho local dev:
+   ```
+   TIKHUB_API_KEY=<token_từ_tikhub.io>
+   ```
+5. Chạy `npm run dev` local để test trước khi thay đổi code
 
-**Dài hạn:**
-5. Deploy static site (GitHub Pages / Vercel) để team dùng thử
-6. Tích hợp API thật theo hướng đã chọn
+**Ưu tiên 3 — Mở rộng tính năng:**
+6. Chọn module tiếp theo: Campaigns hoặc Ideas Board (cần xác nhận ưu tiên)
+7. Facebook connector Phase 2 (cần nghiên cứu thêm về data source)
