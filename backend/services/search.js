@@ -1,7 +1,6 @@
 'use strict';
 
 const config      = require('../config');
-const db          = require('../db/database');
 const tiktok      = require('../connectors/tiktok');
 const facebook    = require('../connectors/facebook');
 const viralScore  = require('./viral-score');
@@ -12,9 +11,8 @@ const CONNECTORS = { tiktok, facebook };
  * Main search entry point.
  *
  * 1. Fetch videos from the correct connector.
- * 2. Persist them + snapshot to DB.
- * 3. Score + filter.
- * 4. Return top N sorted by viralScore desc.
+ * 2. Score + filter.
+ * 3. Return top N sorted by viralScore desc.
  */
 async function search({ keyword, platform, region }) {
   const connector = CONNECTORS[platform];
@@ -22,31 +20,6 @@ async function search({ keyword, platform, region }) {
 
   /* Fetch raw videos from platform */
   const raw = await connector.searchVideos({ keyword, region, count: 50 });
-
-  /* Persist to DB for future growth tracking */
-  for (const v of raw) {
-    try {
-      db.upsertVideo(
-        {
-          id:        v.id,
-          platform:  v.platform,
-          video_id:  v.video_id,
-          region:    v.region,
-          url:       v.url,
-          thumbnail: v.thumbnail,
-          caption:   v.caption,
-          creator:   v.creator,
-          posted_at: v.postedAt
-        },
-        {
-          views:    v.views,
-          comments: v.comments,
-          shares:   v.shares,
-          likes:    v.likes
-        }
-      );
-    } catch { /* non-fatal */ }
-  }
 
   /* Score */
   const scored = await viralScore.scoreVideos(raw);

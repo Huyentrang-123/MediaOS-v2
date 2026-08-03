@@ -3,7 +3,6 @@
 const express = require('express');
 const cors    = require('cors');
 const config  = require('./config');
-const db      = require('./db/database');
 
 const researchRouter = require('./routes/research');
 
@@ -30,7 +29,6 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-db.init();
 app.listen(config.port, () => {
   console.log(`MediaOS backend running on http://localhost:${config.port}`);
   if (!config.tikhub.apiKey) {

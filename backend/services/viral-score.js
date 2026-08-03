@@ -1,7 +1,6 @@
 'use strict';
 
 const config = require('../config');
-const db     = require('../db/database');
 
 const W = config.scoreWeights;
 
@@ -21,21 +20,12 @@ function normalize(val, arr) {
 async function scoreVideos(videos) {
   if (!videos.length) return [];
 
-  /* Attempt to enrich with DB growth data */
-  const enriched = videos.map(v => {
-    let growthRate = null;
-    try {
-      const { latest, week } = db.getGrowthData(v.id);
-      if (latest && week && week.views > 0) {
-        growthRate = ((latest.views - week.views) / week.views) * 100;
-      }
-    } catch { /* DB not ready yet or video not tracked */ }
-
-    /* Fallback: use velocity score (views/hour) as a relative growth proxy */
-    const growthProxy = growthRate !== null ? growthRate : (v.velocityScore || 0);
-
-    return { ...v, growthRate, growthProxy };
-  });
+  /* Phase 1: use velocityScore (views/hour) as growth proxy — no DB yet */
+  const enriched = videos.map(v => ({
+    ...v,
+    growthRate:  null,
+    growthProxy: v.velocityScore || 0
+  }));
 
   /* Derive rates */
   const withRates = enriched.map(v => ({
