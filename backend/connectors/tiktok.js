@@ -145,18 +145,16 @@ async function searchVideos({ keyword, region = 'global', count = 20, offset = 0
   console.log(`[TikHub]   Array path used: ${itemsPath}, length: ${items.length}`);
 
   if (items.length === 0) {
-    /* Log the whole response so we can find the real array */
     console.log('[TikHub]   EMPTY — full parsed response:', JSON.stringify(data));
   } else {
-    /* Log field names of first item to verify normalizeVideo can read them */
-    console.log('[TikHub]   First item keys:', Object.keys(items[0]));
-    const s = items[0].statistics || items[0].stats || {};
-    console.log('[TikHub]   First item stats keys:', Object.keys(s));
-    console.log('[TikHub]   First item stats sample:', JSON.stringify(s));
+    /* Log the complete aweme_info of the first item so we can verify every field */
+    const firstAweme = items[0]?.aweme_info || items[0];
+    console.log('[TikHub]   First item wrapper keys:', Object.keys(items[0]));
+    console.log('[TikHub]   First aweme_info:', JSON.stringify(firstAweme));
   }
 
   const normalized = items.map(v => normalizeVideo(v, region)).filter(Boolean);
-  console.log(`[TikHub]   After normalizeVideo (views > 0 filter): ${normalized.length}/${items.length}`);
+  console.log(`[TikHub]   After normalizeVideo: ${normalized.length}/${items.length}`);
 
   return normalized;
 }
@@ -170,35 +168,41 @@ function coverUrl(videoInfo) {
 }
 
 /*
- * Normalize a raw TikHub app/v3 video item to MediaOS standard format.
+ * Normalize one search_item_list entry to MediaOS standard format.
+ *
+ * Each entry is { aweme_info: {...}, search_aweme_info: {...} }.
+ * All video data lives inside aweme_info.
+ * Statistics may be absent — do NOT filter on views; let scoring decide.
  */
-function normalizeVideo(raw, requestedRegion) {
+function normalizeVideo(item, requestedRegion) {
   try {
-    const stats     = raw.statistics || raw.stats || {};
-    const author    = raw.author || {};
-    const videoInfo = raw.video || {};
+    /* Unwrap the container — fall back to the item itself for schema variants */
+    const v = item?.aweme_info || item;
+
+    const stats     = v.statistics || v.stats || {};
+    const author    = v.author || {};
+    const videoInfo = v.video || {};
 
     const views    = parseInt(stats.play_count    || stats.playCount    || 0, 10);
     const comments = parseInt(stats.comment_count || stats.commentCount || 0, 10);
     const shares   = parseInt(stats.share_count   || stats.shareCount   || 0, 10);
     const likes    = parseInt(stats.digg_count    || stats.diggCount    || stats.like_count || 0, 10);
 
-    /* Skip videos with no views (deleted / private) */
-    if (!views) return null;
+    const videoId  = v.aweme_id || v.id || '';
+    if (!videoId) return null;
 
-    const videoId  = raw.aweme_id || raw.id || '';
-    const postedAt = raw.create_time
-      ? new Date(raw.create_time * 1000).toISOString()
+    const postedAt = v.create_time
+      ? new Date(v.create_time * 1000).toISOString()
       : null;
 
     /* Average views per hour since posting — NOT recent growth, just a time-adjusted reach signal */
     const hoursOld     = postedAt
       ? Math.max(1, (Date.now() - new Date(postedAt).getTime()) / 3_600_000)
       : null;
-    const viewsPerHour = hoursOld ? views / hoursOld : null;
+    const viewsPerHour = (hoursOld && views) ? views / hoursOld : null;
 
     /* Region: prefer what the API reports; fall back to the requested region */
-    const region = (author.region || raw.region || '').toLowerCase() || requestedRegion;
+    const region = (author.region || v.region || '').toLowerCase() || requestedRegion;
 
     return {
       id:            `tiktok:${videoId}`,
@@ -206,7 +210,7 @@ function normalizeVideo(raw, requestedRegion) {
       video_id:      videoId,
       url:           `https://www.tiktok.com/@${author.unique_id}/video/${videoId}`,
       thumbnail:     coverUrl(videoInfo),
-      caption:       raw.desc || '',
+      caption:       v.desc || '',
       creator:       author.nickname || author.unique_id || '',
       creatorHandle: author.unique_id ? `@${author.unique_id}` : '',
       region,
@@ -215,7 +219,7 @@ function normalizeVideo(raw, requestedRegion) {
       comments,
       shares,
       likes,
-      hashtags:      (raw.text_extra || [])
+      hashtags:      (v.text_extra || [])
                        .filter(t => t.hashtag_name)
                        .map(t => t.hashtag_name),
       viewsPerHour
