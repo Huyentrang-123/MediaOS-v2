@@ -2,65 +2,109 @@
 
 const config = require('../config');
 
+/* MediaOS region codes → TikHub region codes */
+const REGION_MAP = {
+  vn: 'VN',
+  kr: 'KR',
+  cn: 'CN',
+  tw: 'TW'
+  /* 'global' is intentionally absent — omit region param to search globally */
+};
+
 async function fetchJson(url, options = {}) {
   const { default: fetch } = await import('node-fetch');
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${config.tikhub.apiKey}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
+
+  const headers = {
+    'Authorization': `Bearer ${config.tikhub.apiKey}`,
+    'Content-Type':  'application/json',
+    ...(options.headers || {})
+  };
+
+  /* Full request log (key masked) */
+  console.log('[TikHub] →', options.method || 'GET', url);
+  console.log('[TikHub]   Headers:', JSON.stringify({
+    ...headers,
+    Authorization: 'Bearer ***'
+  }));
+
+  const res = await fetch(url, { ...options, headers });
+
+  /* Full response log */
+  const body = await res.text();
+  console.log(`[TikHub] ← ${res.status} ${res.statusText}`);
+  console.log('[TikHub]   Body:', body.slice(0, 500));
+
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Tikhub ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(`TikHub ${res.status}: ${body.slice(0, 300)}`);
   }
-  return res.json();
+
+  return JSON.parse(body);
 }
 
 /*
  * Search TikTok videos by keyword.
- * Endpoint: GET /api/v1/tiktok/web/fetch_search_video
- * Docs:     https://api.tikhub.io/#/TikTok-Web-API/fetch_search_video_...
+ *
+ * Endpoint: GET /api/v1/tiktok/app/v3/fetch_video_search_result
+ * Note: /api/v1/tiktok/web/fetch_search_video returns HTTP 400 unconditionally (known TikHub bug).
+ *
+ * Parameters:
+ *   keyword      (required)  — search term
+ *   count        (optional)  — results per page, default 20
+ *   offset       (optional)  — pagination offset, default 0
+ *   sort_type    (optional)  — 0 relevance (default), 1 most liked, 2 newest
+ *   publish_time (optional)  — 0 all time (default)
+ *   region       (optional)  — region code (VN/KR/CN/TW); omit for global
  */
 async function searchVideos({ keyword, region = 'global', count = 30, offset = 0 }) {
   if (!config.tikhub.apiKey) {
     throw new Error('TIKHUB_API_KEY is not configured. Add it to backend/.env');
   }
 
-  const params = new URLSearchParams({
+  const qp = {
     keyword,
-    count:  String(count),
-    offset: String(offset)
-  });
+    count:        String(count),
+    offset:       String(offset),
+    sort_type:    '0',
+    publish_time: '0'
+  };
 
-  const url = `${config.tikhub.baseUrl}/api/v1/tiktok/web/fetch_search_video?${params}`;
-  console.log('[TikHub] GET', url.replace(config.tikhub.apiKey, '***'));
+  const regionCode = REGION_MAP[region];
+  if (regionCode) qp.region = regionCode;
+
+  const params = new URLSearchParams(qp);
+  const url = `${config.tikhub.baseUrl}/api/v1/tiktok/app/v3/fetch_video_search_result?${params}`;
+
+  console.log('[TikHub]   Query params:', JSON.stringify(qp));
 
   const data = await fetchJson(url);
 
-  /* TikHub web search: items at data.data.item_list (primary) or fallbacks */
-  const items = data?.data?.item_list
-    || data?.data?.data
-    || data?.data?.video_list
-    || [];
+  /*
+   * App V3 search response shape:
+   *   { code: 200, data: { search_item_list: [...], has_more: bool, cursor: N } }
+   * Fallbacks for schema variations observed in the wild.
+   */
+  const items =
+    data?.data?.search_item_list ||
+    data?.data?.item_list         ||
+    data?.data?.data              ||
+    data?.data?.video_list        ||
+    [];
 
-  console.log(`[TikHub] raw items: ${items.length}`);
+  console.log(`[TikHub]   Parsed items: ${items.length}`);
 
   return items.map(v => normalizeVideo(v, region)).filter(Boolean);
 }
 
-/* Extract thumbnail URL — cover can be a string or {url_list: [...]} object */
-function coverUrl(raw) {
-  const c = raw?.cover || raw?.dynamic_cover || raw?.origin_cover;
+/* Extract thumbnail — cover can be a string or { url_list: [...] } */
+function coverUrl(videoInfo) {
+  const c = videoInfo?.cover || videoInfo?.dynamic_cover || videoInfo?.origin_cover;
   if (!c) return '';
   if (typeof c === 'string') return c;
   return c.url_list?.[0] || '';
 }
 
 /*
- * Normalize a raw TikHub web-search item to MediaOS standard format.
+ * Normalize a raw TikHub app/v3 video item to MediaOS standard format.
  */
 function normalizeVideo(raw, requestedRegion) {
   try {
@@ -87,7 +131,7 @@ function normalizeVideo(raw, requestedRegion) {
       : null;
     const viewsPerHour = hoursOld ? views / hoursOld : null;
 
-    /* Region: prefer what the API reports, fall back to the requested region */
+    /* Region: prefer what the API reports; fall back to the requested region */
     const region = (author.region || raw.region || '').toLowerCase() || requestedRegion;
 
     return {
@@ -110,7 +154,8 @@ function normalizeVideo(raw, requestedRegion) {
                        .map(t => t.hashtag_name),
       viewsPerHour
     };
-  } catch {
+  } catch (err) {
+    console.warn('[TikHub] normalizeVideo error:', err.message);
     return null;
   }
 }
