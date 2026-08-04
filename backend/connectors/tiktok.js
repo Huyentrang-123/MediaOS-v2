@@ -28,14 +28,16 @@ async function fetchJson(url, options = {}) {
 
   const res = await fetch(url, { ...options, headers });
 
-  /* Full response log */
   const body = await res.text();
   console.log(`[TikHub] ← ${res.status} ${res.statusText}`);
-  console.log('[TikHub]   Body:', body.slice(0, 500));
 
   if (!res.ok) {
+    console.log('[TikHub]   Error body:', body.slice(0, 1000));
     throw new Error(`TikHub ${res.status}: ${body.slice(0, 300)}`);
   }
+
+  /* Log full response so we can verify the exact structure */
+  console.log('[TikHub]   Full body:', body.slice(0, 3000));
 
   return JSON.parse(body);
 }
@@ -77,21 +79,43 @@ async function searchVideos({ keyword, region = 'global', count = 30, offset = 0
 
   const data = await fetchJson(url);
 
+  /* Log top-level keys so we know the real shape even if body was truncated */
+  console.log('[TikHub]   Top-level keys:', Object.keys(data || {}));
+  if (data?.data) {
+    console.log('[TikHub]   data.* keys:', Object.keys(data.data));
+  }
+
   /*
    * App V3 search response shape:
    *   { code: 200, data: { search_item_list: [...], has_more: bool, cursor: N } }
    * Fallbacks for schema variations observed in the wild.
    */
-  const items =
-    data?.data?.search_item_list ||
-    data?.data?.item_list         ||
-    data?.data?.data              ||
-    data?.data?.video_list        ||
-    [];
+  let items = null;
+  let itemsPath = null;
+  if (Array.isArray(data?.data?.search_item_list)) { items = data.data.search_item_list; itemsPath = 'data.data.search_item_list'; }
+  else if (Array.isArray(data?.data?.item_list))   { items = data.data.item_list;         itemsPath = 'data.data.item_list'; }
+  else if (Array.isArray(data?.data?.data))        { items = data.data.data;              itemsPath = 'data.data.data'; }
+  else if (Array.isArray(data?.data?.video_list))  { items = data.data.video_list;        itemsPath = 'data.data.video_list'; }
+  else if (Array.isArray(data?.data))              { items = data.data;                   itemsPath = 'data.data (direct array)'; }
+  else                                             { items = [];                          itemsPath = 'none found'; }
 
-  console.log(`[TikHub]   Parsed items: ${items.length}`);
+  console.log(`[TikHub]   Array path used: ${itemsPath}, length: ${items.length}`);
 
-  return items.map(v => normalizeVideo(v, region)).filter(Boolean);
+  if (items.length === 0) {
+    /* Log the whole response so we can find the real array */
+    console.log('[TikHub]   EMPTY — full parsed response:', JSON.stringify(data));
+  } else {
+    /* Log field names of first item to verify normalizeVideo can read them */
+    console.log('[TikHub]   First item keys:', Object.keys(items[0]));
+    const s = items[0].statistics || items[0].stats || {};
+    console.log('[TikHub]   First item stats keys:', Object.keys(s));
+    console.log('[TikHub]   First item stats sample:', JSON.stringify(s));
+  }
+
+  const normalized = items.map(v => normalizeVideo(v, region)).filter(Boolean);
+  console.log(`[TikHub]   After normalizeVideo (views > 0 filter): ${normalized.length}/${items.length}`);
+
+  return normalized;
 }
 
 /* Extract thumbnail — cover can be a string or { url_list: [...] } */

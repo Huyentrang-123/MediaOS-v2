@@ -20,12 +20,14 @@ async function search({ keyword, platform, region }) {
 
   /* Fetch raw videos from platform */
   const raw = await connector.searchVideos({ keyword, region, count: 50 });
+  console.log(`[Search] connector returned: ${raw.length} videos`);
 
   /* Score */
   const scored = await viralScore.scoreVideos(raw);
 
   /* Filter below minimum threshold */
   const filtered = scored.filter(v => v.viralScore >= config.minViralScore);
+  console.log(`[Search] after score filter (>= ${config.minViralScore}): ${filtered.length}/${scored.length}`);
 
   /* Sort by score desc, take top N */
   filtered.sort((a, b) => b.viralScore - a.viralScore);
