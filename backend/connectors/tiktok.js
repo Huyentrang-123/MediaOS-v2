@@ -20,11 +20,10 @@ async function fetchJson(url, options = {}) {
     ...(options.headers || {})
   };
 
-  /* Full request log (key masked) */
   console.log('[TikHub] →', options.method || 'GET', url);
   console.log('[TikHub]   Headers:', JSON.stringify({
-    ...headers,
-    Authorization: 'Bearer ***'
+    Authorization: '[REDACTED]',
+    'Content-Type': headers['Content-Type']
   }));
 
   const res = await fetch(url, { ...options, headers });
