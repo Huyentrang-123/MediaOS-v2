@@ -19,7 +19,8 @@ async function search({ keyword, platform, region }) {
   if (!connector) throw new Error(`Platform không hỗ trợ: ${platform}`);
 
   /* Fetch raw videos from platform */
-  const raw = await connector.searchVideos({ keyword, region, count: 20 });
+  /* count is determined by the connector (10 for regional, 20 for global) */
+  const raw = await connector.searchVideos({ keyword, region });
   console.log(`[Search] connector returned: ${raw.length} videos`);
 
   /* Score */

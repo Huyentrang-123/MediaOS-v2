@@ -28,6 +28,9 @@ router.get('/', async (req, res, next) => {
     const results = await search.search({ keyword: keyword.trim(), platform, region });
     res.json({ ok: true, count: results.length, data: results });
   } catch (err) {
+    if (err.code === 'TIKHUB_REGIONAL_UNAVAILABLE') {
+      return res.status(503).json({ error: err.message });
+    }
     next(err);
   }
 });
