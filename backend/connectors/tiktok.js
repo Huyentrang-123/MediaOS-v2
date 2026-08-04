@@ -2,13 +2,16 @@
 
 const config = require('../config');
 
-/* MediaOS region codes → TikHub region codes */
+/*
+ * Frontend region ID → TikHub uppercase ISO-3166-1 alpha-2 code.
+ * 'global' is intentionally absent: omitting the param means worldwide search.
+ * Never send lowercase codes (vn/kr/cn/tw) or display labels to TikHub.
+ */
 const REGION_MAP = {
-  vn: 'VN',
-  kr: 'KR',
-  cn: 'CN',
-  tw: 'TW'
-  /* 'global' is intentionally absent — omit region param to search globally */
+  vn: 'VN',   /* Việt Nam  */
+  kr: 'KR',   /* Hàn Quốc */
+  cn: 'CN',   /* Trung Quốc */
+  tw: 'TW'    /* Đài Loan  */
 };
 
 async function fetchJson(url, options = {}) {
@@ -18,11 +21,7 @@ async function fetchJson(url, options = {}) {
     ...(options.headers || {})
   };
 
-  console.log('[TikHub] →', options.method || 'GET', url);
-  console.log('[TikHub]   Headers:', JSON.stringify({
-    Authorization: '[REDACTED]',
-    'Content-Type': headers['Content-Type']
-  }));
+  console.log('[TikHub] →', options.method || 'GET', url.replace(/Authorization=[^&]*/g, 'Authorization=[REDACTED]'));
 
   /* Retry once on socket/stream errors — TikHub closes mid-stream intermittently */
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -104,6 +103,9 @@ async function searchVideos({ keyword, region = 'global', count = 20, offset = 0
     throw new Error('TIKHUB_API_KEY is not configured. Add it to backend/.env');
   }
 
+  /* Resolve region: only append if we have an explicit TikHub code */
+  const regionCode = REGION_MAP[region] || null;
+
   const qp = {
     keyword,
     count:        String(count),
@@ -111,14 +113,14 @@ async function searchVideos({ keyword, region = 'global', count = 20, offset = 0
     sort_type:    '0',
     publish_time: '0'
   };
-
-  const regionCode = REGION_MAP[region];
   if (regionCode) qp.region = regionCode;
 
   const params = new URLSearchParams(qp);
   const url = `${config.tikhub.baseUrl}/api/v1/tiktok/app/v3/fetch_video_search_result?${params}`;
 
-  console.log('[TikHub]   Query params:', JSON.stringify(qp));
+  /* Log the final URL so every region decision is visible in Render logs */
+  console.log(`[TikHub]   Region: frontend="${region}" → TikHub ${regionCode ? `region=${regionCode}` : '(omitted — global)'}`);
+  console.log('[TikHub]   Final URL:', url);
 
   const data = await fetchJson(url);
 
