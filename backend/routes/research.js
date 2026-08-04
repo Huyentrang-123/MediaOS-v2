@@ -10,6 +10,8 @@ const VALID_REGIONS   = ['global', 'vn', 'kr', 'cn', 'tw'];
 
 /*
  * GET /api/research?keyword=serum+nám&platform=tiktok&region=vn
+ * Response: { ok, count, data, fallback }
+ *   fallback=true means no video met minViralScore; top 10 returned anyway.
  */
 router.get('/', async (req, res, next) => {
   try {
@@ -25,10 +27,10 @@ router.get('/', async (req, res, next) => {
       return res.status(400).json({ error: `region không hợp lệ. Dùng: ${VALID_REGIONS.join(', ')}` });
     }
 
-    const results = await search.search({ keyword: keyword.trim(), platform, region });
-    res.json({ ok: true, count: results.length, data: results });
+    const { data, fallback } = await search.search({ keyword: keyword.trim(), platform, region });
+    res.json({ ok: true, count: data.length, data, fallback: fallback || false });
   } catch (err) {
-    if (err.code === 'TIKHUB_REGIONAL_UNAVAILABLE') {
+    if (err.code === 'TIKHUB_REGIONAL_UNAVAILABLE' || err.code === 'DOUYIN_UNAVAILABLE') {
       return res.status(503).json({ error: err.message });
     }
     next(err);

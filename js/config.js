@@ -17,7 +17,7 @@ const CONFIG = {
     { id: 'global', label: '🌏 Toàn cầu',  flag: '🌏' },
     { id: 'vn',     label: '🇻🇳 Việt Nam',  flag: '🇻🇳' },
     { id: 'kr',     label: '🇰🇷 Hàn Quốc', flag: '🇰🇷' },
-    { id: 'cn',     label: '🇨🇳 Trung Quốc',flag: '🇨🇳' },
+    { id: 'cn',     label: '🇨🇳 Trung Quốc · Douyin', flag: '🇨🇳' },
     { id: 'tw',     label: '🇹🇼 Đài Loan',  flag: '🇹🇼' }
   ],
 

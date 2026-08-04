@@ -9,6 +9,7 @@ const BACKEND_URL = '';
 /* Module-level state for API results */
 let _apiResults  = [];
 let _searchState = 'idle'; // 'idle' | 'loading' | 'done' | 'error'
+let _fallback    = false;   // true when no video met minViralScore
 
 /* Map backend response to renderVideoCard() format */
 function apiVideoToCard(v) {
@@ -160,10 +161,14 @@ async function renderGrid(triggerSearch = false) {
     if (_searchState === 'loading') return;
     _searchState = 'loading';
     _apiResults  = [];
+    _fallback    = false;
 
     /* Phase 1: Facebook connector not yet implemented — fall back to TikTok */
     const platform = (fs.platform === 'all' || fs.platform === 'facebook')
       ? 'tiktok' : fs.platform;
+
+    /* Provider label for loading message */
+    const providerLabel = fs.region === 'cn' ? 'Douyin' : 'TikTok';
 
     const searchBtn = $('#vrSearchBtn');
     if (searchBtn) { searchBtn.disabled = true; searchBtn.textContent = '⏳ Đang phân tích...'; }
@@ -171,7 +176,7 @@ async function renderGrid(triggerSearch = false) {
     grid.innerHTML = `
       <div class="empty-state" style="grid-column:1/-1">
         <div class="empty-icon">⏳</div>
-        <div class="empty-title">MediaOS đang phân tích video TikTok...</div>
+        <div class="empty-title">MediaOS đang phân tích video ${providerLabel}...</div>
         <div class="empty-desc">Đang thu thập và xếp hạng video với từ khóa <strong>${esc(fs.keyword.trim())}</strong></div>
       </div>`;
 
@@ -188,6 +193,7 @@ async function renderGrid(triggerSearch = false) {
       }
       const json   = await resp.json();
       _apiResults  = (json.data || []).map(apiVideoToCard);
+      _fallback    = json.fallback || false;
       _searchState = 'done';
     } catch (err) {
       console.error('[VR] Backend error:', err);
@@ -196,11 +202,8 @@ async function renderGrid(triggerSearch = false) {
       grid.innerHTML = `
         <div class="empty-state" style="grid-column:1/-1">
           <div class="empty-icon">⚠️</div>
-          <div class="empty-title">Không thể kết nối đến backend</div>
-          <div class="empty-desc">
-            ${esc(err.message)}<br>
-            Đảm bảo backend đang chạy: <code>npm run dev</code>
-          </div>
+          <div class="empty-title">Không tải được kết quả</div>
+          <div class="empty-desc">${esc(err.message)}</div>
         </div>`;
     } finally {
       if (searchBtn) { searchBtn.disabled = false; searchBtn.textContent = '🔍 Phân tích'; }
@@ -230,7 +233,11 @@ async function renderGrid(triggerSearch = false) {
   /* _searchState === 'done' — client-side filter on cached results */
   let results = _apiResults.slice();
   if (fs.platform !== 'all') {
-    results = results.filter(v => v.platform === fs.platform);
+    /* 'tiktok' chip also includes douyin — both are non-Facebook short-video */
+    const include = fs.platform === 'tiktok'
+      ? ['tiktok', 'douyin']
+      : [fs.platform];
+    results = results.filter(v => include.includes(v.platform));
   }
   if (fs.region !== 'global') {
     results = results.filter(v => v.region === fs.region);
@@ -249,6 +256,14 @@ async function renderGrid(triggerSearch = false) {
   }
 
   grid.innerHTML = results.map(v => renderVideoCard(v)).join('');
+
+  if (_fallback) {
+    const banner = document.createElement('div');
+    banner.style = 'grid-column:1/-1;text-align:center;padding:10px 16px;background:var(--badge-gray-bg,#f3f4f6);border-radius:8px;font-size:13px;color:var(--text-3,#888)';
+    banner.textContent = 'Dữ liệu tham khảo — chưa đạt ngưỡng viral cao';
+    grid.insertBefore(banner, grid.firstChild);
+  }
+
   attachCardHandlers(grid);
 }
 

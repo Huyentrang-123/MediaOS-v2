@@ -1,52 +1,29 @@
 'use strict';
 
-const config      = require('../config');
-const tiktok      = require('../connectors/tiktok');
-const facebook    = require('../connectors/facebook');
-const viralScore  = require('./viral-score');
-
-const CONNECTORS = { tiktok, facebook };
+const { marketSearch } = require('./market-search');
+const viralScore       = require('./viral-score');
 
 /*
- * Main search entry point.
- *
- * 1. Fetch videos from the correct connector.
- * 2. Score + filter.
- * 3. Return top N sorted by viralScore desc.
+ * Main search entry point — delegates to the market-aware orchestrator.
+ * `platform` is accepted for API compatibility but ignored in Phase 1
+ * (Facebook is Phase 2; CN market always routes to Douyin via market-search).
+ * Returns { data: Video[], fallback: boolean }.
  */
 async function search({ keyword, platform, region }) {
-  const connector = CONNECTORS[platform];
-  if (!connector) throw new Error(`Platform không hỗ trợ: ${platform}`);
+  const { videos, fallback } = await marketSearch({ keyword, market: region });
 
-  /* Fetch raw videos from platform */
-  /* count is determined by the connector (10 for regional, 20 for global) */
-  const raw = await connector.searchVideos({ keyword, region });
-  console.log(`[Search] connector returned: ${raw.length} videos`);
-
-  /* Score */
-  const scored = await viralScore.scoreVideos(raw);
-
-  /* Filter below minimum threshold */
-  const filtered = scored.filter(v => v.viralScore >= config.minViralScore);
-  console.log(`[Search] after score filter (>= ${config.minViralScore}): ${filtered.length}/${scored.length}`);
-
-  /* Sort by score desc, take top N */
-  filtered.sort((a, b) => b.viralScore - a.viralScore);
-  const results = filtered.slice(0, config.maxResults);
-
-  /* Format response */
-  return results.map(v => {
+  const data = videos.map(v => {
     const info = viralScore.getScoreLabel(v.viralScore);
     return {
-      id:           v.id,
-      platform:     v.platform,
-      url:          v.url,
-      thumbnail:    v.thumbnail,
-      caption:      v.caption,
-      creator:      v.creator,
-      creatorHandle:v.creatorHandle,
-      region:       v.region,
-      postedAt:     v.postedAt,
+      id:            v.id,
+      platform:      v.platform,
+      url:           v.url,
+      thumbnail:     v.thumbnail,
+      caption:       v.caption,
+      creator:       v.creator,
+      creatorHandle: v.creatorHandle,
+      region:        v.region,
+      postedAt:      v.postedAt,
       stats: {
         views:      v.views,
         comments:   v.comments,
@@ -55,13 +32,15 @@ async function search({ keyword, platform, region }) {
         growthRate: v.growthRate !== null ? `+${v.growthRate.toFixed(1)}%` : null
       },
       viral: {
-        score:      v.viralScore,
-        label:      info.label,
-        badgeCls:   info.cls
+        score:    v.viralScore,
+        label:    info.label,
+        badgeCls: info.cls
       },
-      hashtags:     v.hashtags || []
+      hashtags: v.hashtags || []
     };
   });
+
+  return { data, fallback };
 }
 
 module.exports = { search };

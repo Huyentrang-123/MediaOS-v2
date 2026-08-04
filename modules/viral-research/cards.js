@@ -6,7 +6,8 @@
 
 const PLATFORM_ICON = {
   tiktok:   '♪',
-  facebook: 'f'
+  facebook: 'f',
+  douyin:   '抖'
 };
 
 const REGION_FLAG = {
@@ -19,7 +20,9 @@ function renderVideoCard(video) {
   const isSaved       = state.viralResearch.saved.some(s => s.id === video.id);
   const whyReason     = generateViralReason(video);
   const flag          = REGION_FLAG[video.region] || '';
-  const platformLabel = video.platform === 'tiktok' ? 'TikTok' : 'Facebook';
+  const platformLabel = video.platform === 'tiktok' ? 'TikTok'
+    : video.platform === 'douyin' ? 'Douyin'
+    : 'Facebook';
   const ago           = timeAgo(video.postedDate);
 
   return `
