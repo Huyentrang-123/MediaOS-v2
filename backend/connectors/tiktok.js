@@ -12,8 +12,6 @@ const REGION_MAP = {
 };
 
 async function fetchJson(url, options = {}) {
-  const { default: fetch } = await import('node-fetch');
-
   const headers = {
     'Authorization': `Bearer ${config.tikhub.apiKey}`,
     'Content-Type':  'application/json',
@@ -26,20 +24,28 @@ async function fetchJson(url, options = {}) {
     'Content-Type': headers['Content-Type']
   }));
 
-  const res = await fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers });
 
-  const body = await res.text();
-  console.log(`[TikHub] ← ${res.status} ${res.statusText}`);
+  console.log(`[TikHub] ← ${response.status} ${response.statusText}`);
+  console.log('[TikHub]   Response headers:', JSON.stringify({
+    'content-type':   response.headers.get('content-type'),
+    'content-length': response.headers.get('content-length')
+  }));
 
-  if (!res.ok) {
-    console.log('[TikHub]   Error body:', body.slice(0, 1000));
-    throw new Error(`TikHub ${res.status}: ${body.slice(0, 300)}`);
+  const text = await response.text();
+  console.log('[TikHub]   Body (first 500):', text.slice(0, 500));
+
+  if (!response.ok) {
+    throw new Error(`TikHub ${response.status}: ${text.slice(0, 300)}`);
   }
 
-  /* Log full response so we can verify the exact structure */
-  console.log('[TikHub]   Full body:', body.slice(0, 3000));
-
-  return JSON.parse(body);
+  try {
+    return JSON.parse(text);
+  } catch (parseErr) {
+    console.log('[TikHub]   JSON parse failed — body length:', text.length, 'content-type:', response.headers.get('content-type'));
+    console.log('[TikHub]   Full body:', text);
+    throw new Error(`TikHub response is not valid JSON: ${parseErr.message}`);
+  }
 }
 
 /*
