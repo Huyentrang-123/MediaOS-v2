@@ -56,7 +56,7 @@ async function fetchJson(url, options = {}) {
  *   publish_time (optional)  — 0 all time (default)
  *   region       (optional)  — region code (VN/KR/CN/TW); omit for global
  */
-async function searchVideos({ keyword, region = 'global', count = 30, offset = 0 }) {
+async function searchVideos({ keyword, region = 'global', count = 20, offset = 0 }) {
   if (!config.tikhub.apiKey) {
     throw new Error('TIKHUB_API_KEY is not configured. Add it to backend/.env');
   }
