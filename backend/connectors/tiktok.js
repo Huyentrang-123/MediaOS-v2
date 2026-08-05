@@ -58,7 +58,9 @@ async function fetchOnce(url, headers, { region = null, attempt = 1, timeoutMs =
     console.log(`${tag}   Body (first 500): ${text.slice(0, 500)}`);
 
     if (!response.ok) {
-      throw new Error(`TikHub ${response.status}: ${text.slice(0, 300)}`);
+      const err = new Error(`TikHub ${response.status}: ${text.slice(0, 300)}`);
+      if (response.status === 402) err.code = 'TIKHUB_QUOTA_EXCEEDED';
+      throw err;
     }
 
     try {
@@ -124,7 +126,7 @@ async function searchVideos({ keyword, region = 'global', offset = 0 }) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const data = await fetchOnce(url, headers, { region: regionCode, attempt, timeoutMs });
-      return extractVideos(data, region);
+      return extractVideos(data, region, offset);
     } catch (err) {
       lastErr = err;
       if (attempt < maxAttempts && isRetryable(err)) {
@@ -150,8 +152,9 @@ async function searchVideos({ keyword, region = 'global', offset = 0 }) {
  *
  * App V3 shape: { code: 200, data: { search_item_list: [...], has_more, cursor } }
  * Each entry: { aweme_info: {...}, search_aweme_info: {...} }
+ * Returns { videos, hasMore, nextOffset }.
  */
-function extractVideos(data, region) {
+function extractVideos(data, region, requestedOffset = 0) {
   console.log('[TikHub]   Top-level keys:', Object.keys(data || {}));
   if (data?.data) console.log('[TikHub]   data.* keys:', Object.keys(data.data));
 
@@ -166,6 +169,12 @@ function extractVideos(data, region) {
 
   console.log(`[TikHub]   Array path used: ${itemsPath}, length: ${items.length}`);
 
+  const hasMore   = data?.data?.has_more === 1 || data?.data?.has_more === true;
+  const rawCursor = data?.data?.cursor ?? null;
+  const nextOffset = hasMore
+    ? (rawCursor != null ? Number(rawCursor) : requestedOffset + items.length)
+    : null;
+
   if (items.length === 0) {
     console.log('[TikHub]   EMPTY — full parsed response:', JSON.stringify(data));
   } else {
@@ -174,9 +183,9 @@ function extractVideos(data, region) {
     console.log('[TikHub]   First aweme_info:', JSON.stringify(firstAweme));
   }
 
-  const normalized = items.map(v => normalizeVideo(v, region)).filter(Boolean);
-  console.log(`[TikHub]   After normalizeVideo: ${normalized.length}/${items.length}`);
-  return normalized;
+  const videos = items.map(v => normalizeVideo(v, region)).filter(Boolean);
+  console.log(`[TikHub]   After normalizeVideo: ${videos.length}/${items.length} hasMore=${hasMore} nextOffset=${nextOffset}`);
+  return { videos, hasMore, nextOffset };
 }
 
 /* Extract thumbnail — cover can be a string or { url_list: [...] } */

@@ -5,7 +5,8 @@
 'use strict';
 
 /* Dynamic score computed from engagement metrics normalized across the dataset.
-   Weights: growth 40%, share rate 25%, comment rate 20%, total views 15%. */
+   Weights: growth 40%, share rate 25%, comment rate 20%, total views 15%.
+   (Front-end approximation for mock data — actual scores come from the backend.) */
 function calculateViralScore(video, dataset) {
   function normalize(val, arr) {
     const min = Math.min(...arr);
@@ -14,16 +15,20 @@ function calculateViralScore(video, dataset) {
     return (val - min) / (max - min);
   }
 
-  const growths      = dataset.map(v => v.viewsGrowth7d);
-  const shareRates   = dataset.map(v => v.shares / v.views);
-  const commentRates = dataset.map(v => v.comments / v.views);
+  const growths      = dataset.map(v => v.viewsGrowth7d || 0);
+  const shareRates   = dataset.map(v => v.views > 0 ? v.shares / v.views : 0);
+  const commentRates = dataset.map(v => v.views > 0 ? v.comments / v.views : 0);
   const views        = dataset.map(v => v.views);
 
+  const growth7d   = video.viewsGrowth7d || 0;
+  const shareRate  = video.views > 0 ? video.shares  / video.views  : 0;
+  const commentRate = video.views > 0 ? video.comments / video.views : 0;
+
   const score =
-    0.40 * normalize(video.viewsGrowth7d,         growths)      +
-    0.25 * normalize(video.shares / video.views,  shareRates)   +
-    0.20 * normalize(video.comments / video.views, commentRates) +
-    0.15 * normalize(video.views,                 views);
+    0.40 * normalize(growth7d,    growths)      +
+    0.25 * normalize(shareRate,   shareRates)   +
+    0.20 * normalize(commentRate, commentRates) +
+    0.15 * normalize(video.views, views);
 
   return Math.round(score * 100);
 }
@@ -36,15 +41,24 @@ function getScoreLabel(score) {
 }
 
 function generateViralReason(video) {
-  const growthLabel = video.viewsGrowth7d >= 400
-    ? `tăng trưởng <strong>${video.viewsGrowth7d}%</strong> lượt xem trong 7 ngày — thuộc top bùng nổ của nền tảng`
-    : `tăng <strong>${video.viewsGrowth7d}%</strong> lượt xem trong 7 ngày gần nhất`;
+  /* Phase 1 has no 7-day growth data — guard against null */
+  let openingLine;
+  if (video.viewsGrowth7d != null) {
+    const growthLabel = video.viewsGrowth7d >= 400
+      ? `tăng trưởng <strong>${video.viewsGrowth7d}%</strong> lượt xem trong 7 ngày — thuộc top bùng nổ của nền tảng`
+      : `tăng <strong>${video.viewsGrowth7d}%</strong> lượt xem trong 7 ngày gần nhất`;
+    openingLine = `Video ${growthLabel}.`;
+  } else {
+    openingLine = `Video đạt <strong>${formatNumber(video.views)}</strong> lượt xem.`;
+  }
 
-  const shareRate = ((video.shares / video.views) * 100).toFixed(1);
-  const commentRate = ((video.comments / video.views) * 100).toFixed(2);
+  const shareRate   = video.views > 0 ? ((video.shares   / video.views) * 100).toFixed(1) : '0.0';
+  const commentRate = video.views > 0 ? ((video.comments / video.views) * 100).toFixed(2) : '0.00';
 
   const platformPush = video.platform === 'tiktok'
     ? 'Thuật toán TikTok FYP đang đẩy mạnh video này đến nhiều tệp người dùng mới.'
+    : video.platform === 'douyin'
+    ? 'Douyin đang đẩy video này trong feed khám phá Trung Quốc.'
     : 'Facebook Reels đang đề xuất video vào feed của nhiều nhóm beauty liên quan.';
 
   const regionInsight = {
@@ -58,5 +72,5 @@ function generateViralReason(video) {
     ? 'Đây là loại nội dung có khả năng lan truyền cực mạnh — nên nghiên cứu format và hook đầu video.'
     : 'Nội dung đang tăng trưởng tốt, phù hợp để tham khảo cho chiến lược content giai đoạn này.';
 
-  return `Video ${growthLabel}. Tỷ lệ chia sẻ <strong>${shareRate}%</strong> (benchmark ngành ~0.8%) và tỷ lệ bình luận <strong>${commentRate}%</strong> cho thấy mức độ tương tác rất cao. ${platformPush} ${regionInsight[video.region] || ''} ${scoreTag}`;
+  return `${openingLine} Tỷ lệ chia sẻ <strong>${shareRate}%</strong> (benchmark ngành ~0.8%) và tỷ lệ bình luận <strong>${commentRate}%</strong> cho thấy mức độ tương tác rất cao. ${platformPush} ${regionInsight[video.region] || ''} ${scoreTag}`;
 }

@@ -1,15 +1,11 @@
 'use strict';
 
-const tiktok               = require('../connectors/tiktok');
-const douyin               = require('../connectors/douyin');
-const { queriesForMarket } = require('./query-expansion');
-const viralScore           = require('./viral-score');
-const config               = require('../config');
+const tiktok          = require('../connectors/tiktok');
+const douyin          = require('../connectors/douyin');
+const { allVariants } = require('./query-expansion');
+const viralScore      = require('./viral-score');
+const config          = require('../config');
 
-/*
- * Per-market routing table.
- * region=null means the connector handles globally (no region param).
- */
 const MARKET_CONFIG = {
   global: { connector: tiktok, region: 'global' },
   vn:     { connector: tiktok, region: 'vn' },
@@ -18,103 +14,87 @@ const MARKET_CONFIG = {
   cn:     { connector: douyin, region: null },
 };
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+/* 30-minute in-memory response cache keyed by market:provider:query:offset */
+const _cache    = new Map();
+const CACHE_TTL = 30 * 60 * 1000;
+const PAGE_SIZE = 10;
+
+function getCached(key) {
+  const entry = _cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) { _cache.delete(key); return null; }
+  return entry.data;
 }
 
-function isStreamError(err) {
-  if (!err) return false;
-  if (err.name === 'SocketError')                   return true;
-  if (err.cause?.code === 'UND_ERR_SOCKET')         return true;
-  if (err.message?.includes('terminated'))          return true;
-  if (err.message?.includes('other side closed'))   return true;
-  if (err.message?.includes('premature close'))     return true;
-  if (/^(TikHub|Douyin) 5\d\d:/.test(err.message)) return true;
-  return false;
-}
-
-async function fetchWithRetry(connector, args, maxAttempts = 2) {
-  let lastErr = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await connector.searchVideos(args);
-    } catch (err) {
-      lastErr = err;
-      if (attempt < maxAttempts && isStreamError(err)) {
-        console.warn(`[MarketSearch] query="${args.keyword}" attempt=${attempt} retry in 2s`);
-        await sleep(2_000);
-      } else {
-        break;
-      }
-    }
-  }
-  throw lastErr;
+function setCached(key, data) {
+  _cache.set(key, { ts: Date.now(), data });
 }
 
 /*
- * Market-aware search:
- * 1. Expand the keyword into localized queries for the target market.
- * 2. Call the appropriate connector (TikTok or Douyin) sequentially per query.
- * 3. Deduplicate by video_id across all query results.
- * 4. Score the full deduplicated pool.
- * 5. Filter by minViralScore; if nothing passes, fall back to top 10.
+ * Market-aware search — single-query fetch with caching.
  *
- * Errors on the first (primary) query propagate to the caller.
- * Errors on secondary queries are logged and skipped.
+ * query:  specific localized query to use; defaults to allVariants()[0].
+ * offset: pagination offset (0 = first page).
+ *
+ * Returns: { videos, fallback, hasMore, nextOffset, rawCount, returnedCount }
+ *   fallback=true: no video met minViralScore; top results returned with _reference=true.
  */
-async function marketSearch({ keyword, market }) {
+async function marketSearch({ keyword, market, query, offset = 0 }) {
   const cfg = MARKET_CONFIG[market];
   if (!cfg) throw new Error(`Unknown market: ${market}`);
 
-  const queries = queriesForMarket(keyword, market);
-  console.log(`[MarketSearch] market=${market} queries=${JSON.stringify(queries)}`);
+  const effectiveQuery = query || allVariants(keyword, market)[0] || keyword.trim();
+  const provider       = market === 'cn' ? 'douyin' : 'tiktok';
+  const cacheKey       = `${market}:${provider}:${effectiveQuery}:${offset}`;
 
-  const seen = new Set();
-  const all  = [];
+  console.log(`[MarketSearch] market=${market} provider=${provider} query="${effectiveQuery}" offset=${offset}`);
 
-  for (const q of queries) {
-    const connectorArgs = cfg.region !== null
-      ? { keyword: q, region: cfg.region }
-      : { keyword: q };
-
-    try {
-      const videos = await fetchWithRetry(cfg.connector, connectorArgs, 2);
-      console.log(`[MarketSearch]   query="${q}" → ${videos.length} raw videos`);
-
-      for (const v of videos) {
-        const key = v.video_id || v.id;
-        if (!seen.has(key)) {
-          seen.add(key);
-          all.push({ ...v, matchedQuery: q, originalKeyword: keyword });
-        }
-      }
-    } catch (err) {
-      if (q === queries[0]) {
-        /* Primary query failed — surface to caller with original error code */
-        throw err;
-      }
-      /* Secondary query failed — log and continue */
-      console.warn(`[MarketSearch]   query="${q}" failed (non-fatal): ${err.message}`);
-    }
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log(`[MarketSearch] cache hit: ${cacheKey}`);
+    return cached;
   }
 
-  console.log(`[MarketSearch] total after dedup: ${all.length}`);
+  const connectorArgs = { keyword: effectiveQuery, offset };
+  if (cfg.region !== null) connectorArgs.region = cfg.region;
 
-  if (all.length === 0) return { videos: [], fallback: false };
+  /* Let connector errors (including TIKHUB_QUOTA_EXCEEDED, TIKHUB_REGIONAL_UNAVAILABLE) propagate */
+  const { videos: rawVideos, hasMore, nextOffset } = await cfg.connector.searchVideos(connectorArgs);
+  const rawCount = rawVideos.length;
+  console.log(`[MarketSearch] raw=${rawCount} hasMore=${hasMore} nextOffset=${nextOffset}`);
 
-  const scored   = await viralScore.scoreVideos(all);
-  const filtered = scored.filter(v => v.viralScore >= config.minViralScore);
-
-  console.log(`[MarketSearch] after score filter (>=${config.minViralScore}): ${filtered.length}/${scored.length}`);
-
-  if (filtered.length > 0) {
-    filtered.sort((a, b) => b.viralScore - a.viralScore);
-    return { videos: filtered.slice(0, config.maxResults), fallback: false };
+  if (rawCount === 0) {
+    const result = { videos: [], fallback: false, hasMore: false, nextOffset: null, rawCount: 0, returnedCount: 0 };
+    setCached(cacheKey, result);
+    return result;
   }
 
-  /* Nothing met the threshold — return best 10 with a fallback flag */
-  scored.sort((a, b) => b.viralScore - a.viralScore);
-  return { videos: scored.slice(0, 10), fallback: true };
+  const scored = await viralScore.scoreVideos(rawVideos);
+  const viral  = scored.filter(v => v.viralScore >= config.minViralScore);
+  viral.sort((a, b) => b.viralScore - a.viralScore);
+
+  let videos;
+  let fallback;
+
+  if (viral.length > 0) {
+    videos   = viral.slice(0, PAGE_SIZE);
+    fallback = false;
+  } else {
+    scored.sort((a, b) => b.viralScore - a.viralScore);
+    videos   = scored.slice(0, PAGE_SIZE).map(v => ({ ...v, _reference: true }));
+    fallback = true;
+  }
+
+  const result = {
+    videos,
+    fallback,
+    hasMore:       !!hasMore,
+    nextOffset,
+    rawCount,
+    returnedCount: videos.length
+  };
+  setCached(cacheKey, result);
+  return result;
 }
 
 module.exports = { marketSearch };

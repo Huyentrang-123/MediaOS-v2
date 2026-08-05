@@ -40,7 +40,9 @@ async function fetchOnce(url, headers, { attempt = 1, timeoutMs = 90_000 } = {})
     console.log(`${tag}   Body (first 500): ${text.slice(0, 500)}`);
 
     if (!response.ok) {
-      throw new Error(`Douyin ${response.status}: ${text.slice(0, 300)}`);
+      const err = new Error(`Douyin ${response.status}: ${text.slice(0, 300)}`);
+      if (response.status === 402) err.code = 'TIKHUB_QUOTA_EXCEEDED';
+      throw err;
     }
 
     try {
@@ -76,7 +78,8 @@ async function searchVideos({ keyword, offset = 0 }) {
     'Content-Type':  'application/json',
   };
 
-  const page = String(Math.floor(offset / 10) + 1);
+  const pageInt = Math.floor(offset / 10) + 1;
+  const page    = String(pageInt);
   const qp = {
     keyword,
     sort_type:       '0',
@@ -95,7 +98,7 @@ async function searchVideos({ keyword, offset = 0 }) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const data = await fetchOnce(url, headers, { attempt, timeoutMs: 90_000 });
-      return extractVideos(data);
+      return extractVideos(data, pageInt);
     } catch (err) {
       lastErr = err;
       if (attempt < maxAttempts && isRetryable(err)) {
@@ -115,7 +118,8 @@ async function searchVideos({ keyword, offset = 0 }) {
   throw lastErr;
 }
 
-function extractVideos(data) {
+/* Returns { videos, hasMore, nextOffset }. page is 1-based. */
+function extractVideos(data, page = 1) {
   console.log('[Douyin]   Top-level keys:', Object.keys(data || {}));
   if (data?.data) console.log('[Douyin]   data.* keys:', Object.keys(data.data));
 
@@ -130,6 +134,9 @@ function extractVideos(data) {
 
   console.log(`[Douyin]   Array path: ${itemsPath}, length: ${items.length}`);
 
+  const hasMore    = data?.data?.has_more === 1 || data?.data?.has_more === true;
+  const nextOffset = hasMore ? page * 10 : null;
+
   if (items.length === 0) {
     console.log('[Douyin]   EMPTY — full parsed response:', JSON.stringify(data));
   } else {
@@ -138,9 +145,9 @@ function extractVideos(data) {
     console.log('[Douyin]   First aweme_info:', JSON.stringify(first));
   }
 
-  const normalized = items.map(v => normalizeVideo(v)).filter(Boolean);
-  console.log(`[Douyin]   After normalizeVideo: ${normalized.length}/${items.length}`);
-  return normalized;
+  const videos = items.map(v => normalizeVideo(v)).filter(Boolean);
+  console.log(`[Douyin]   After normalizeVideo: ${videos.length}/${items.length} hasMore=${hasMore} nextOffset=${nextOffset}`);
+  return { videos, hasMore, nextOffset };
 }
 
 function coverUrl(videoInfo) {

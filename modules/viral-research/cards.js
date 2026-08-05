@@ -17,7 +17,7 @@ const REGION_FLAG = {
 function renderVideoCard(video) {
   const scoreInfo     = getScoreLabel(video.viralScore);
   const isHot         = video.viralScore >= 90;
-  const isSaved       = state.viralResearch.saved.some(s => s.id === video.id);
+  const isSaved       = state.viralResearch.saved.some(s => String(s.id) === String(video.id));
   const whyReason     = generateViralReason(video);
   const flag          = REGION_FLAG[video.region] || '';
   const platformLabel = video.platform === 'tiktok' ? 'TikTok'
@@ -26,11 +26,11 @@ function renderVideoCard(video) {
   const ago           = timeAgo(video.postedDate);
 
   return `
-    <div class="vr-card" data-id="${video.id}">
+    <div class="vr-card" data-id="${esc(String(video.id))}">
       <div class="vr-thumb">
         <img src="${esc(video.thumbnail)}" alt="${esc(video.title)}" loading="lazy">
         <div class="vr-platform ${video.platform}">
-          <span>${PLATFORM_ICON[video.platform]}</span>
+          <span>${PLATFORM_ICON[video.platform] || ''}</span>
           <span>${platformLabel}</span>
         </div>
         <div class="vr-score-badge ${isHot ? 'hot' : ''}">
@@ -44,6 +44,7 @@ function renderVideoCard(video) {
           <span class="vr-region">${flag}</span>
           <span>${esc(video.creator)}</span>
           <span class="vr-date">${ago}</span>
+          ${video.matchedQuery ? `<span style="font-size:11px;color:var(--text-3);margin-left:auto">🔎 ${esc(video.matchedQuery)}</span>` : ''}
         </div>
 
         <a class="vr-title vr-title-link" href="${esc(video.url)}" target="_blank" rel="noopener noreferrer">
@@ -60,14 +61,17 @@ function renderVideoCard(video) {
             : ''}
         </div>
 
-        <span class="badge ${scoreInfo.cls}" style="align-self:flex-start">${scoreInfo.label}</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="badge ${scoreInfo.cls}" style="align-self:flex-start">${scoreInfo.label}</span>
+          ${video._reference ? '<span class="badge badge-gray">Kết quả tham khảo</span>' : ''}
+        </div>
 
         <div class="vr-why">
-          <button class="vr-why-toggle" data-id="${video.id}">
+          <button class="vr-why-toggle" data-id="${esc(String(video.id))}">
             🧠 Tại sao video này viral?
             <span class="arrow">▼</span>
           </button>
-          <div class="vr-why-body" id="why-${video.id}">
+          <div class="vr-why-body" id="why-${esc(String(video.id))}">
             <p>${whyReason}</p>
             <div class="vr-why-tags">
               ${video.tags.map(t => `<span class="vr-tag">#${esc(t)}</span>`).join('')}
@@ -80,19 +84,25 @@ function renderVideoCard(video) {
         <a class="vr-btn-watch" href="${esc(video.url)}" target="_blank" rel="noopener noreferrer">
           🎬 Xem video
         </a>
-        <button class="vr-btn-save ${isSaved ? 'saved' : ''}" data-id="${video.id}">
+        <button class="vr-btn-save ${isSaved ? 'saved' : ''}" data-id="${esc(String(video.id))}">
           ${isSaved ? '⭐ Đã lưu' : '☆ Lưu'}
         </button>
       </div>
     </div>`;
 }
 
-function attachCardHandlers(container) {
+/*
+ * Attach event handlers to cards inside `container`.
+ * videoSource: array of card objects to look up for the save action
+ *              (pass _apiResults from index.js, not the static VR_DATA).
+ */
+function attachCardHandlers(container, videoSource) {
   /* Why viral toggle */
   $$('.vr-why-toggle', container).forEach(btn => {
     btn.addEventListener('click', () => {
       const id   = btn.dataset.id;
       const body = $(`#why-${id}`);
+      if (!body) return;
       const open = body.classList.toggle('open');
       btn.classList.toggle('open', open);
     });
@@ -101,11 +111,11 @@ function attachCardHandlers(container) {
   /* Save toggle */
   $$('.vr-btn-save', container).forEach(btn => {
     btn.addEventListener('click', () => {
-      const id    = parseInt(btn.dataset.id);
-      const video = VR_DATA.find(v => v.id === id);
+      const id    = btn.dataset.id;
+      const video = (videoSource || []).find(v => String(v.id) === String(id));
       if (!video) return;
 
-      const idx = state.viralResearch.saved.findIndex(v => v.id === id);
+      const idx = state.viralResearch.saved.findIndex(v => String(v.id) === String(id));
       if (idx === -1) {
         state.viralResearch.saved.push(video);
         btn.textContent = '⭐ Đã lưu';
