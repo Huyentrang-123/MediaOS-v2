@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "MediaOS Viral Research",
+  "version": "1.0.0",
+  "description": "Thu thập video viral từ TikTok và Facebook",
+
+  "permissions": ["activeTab", "storage", "scripting", "tabs", "clipboardWrite"],
+
+  "host_permissions": [
+    "https://www.tiktok.com/*",
+    "https://www.facebook.com/*",
+    "http://localhost:*/*",
+    "https://*.onrender.com/*"
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MediaOS – Thu thập video viral"
+  },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://www.tiktok.com/search*"],
+      "js": ["content/tiktok-parser.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://www.facebook.com/search/videos*", "https://www.facebook.com/watch*"],
+      "js": ["content/facebook-parser.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["http://localhost:*/*", "https://*.onrender.com/*"],
+      "js": ["content/mediaos-bridge.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
