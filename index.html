@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MediaOS — Media Department Platform</title>
 
-  <!-- CSS: variables first, then base, then layout + components, then modules -->
+  <!-- CSS: tokens → base → layout+components → modules -->
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
@@ -35,7 +35,7 @@
           <div class="nav-section-label">NGHIÊN CỨU</div>
           <a class="nav-item" data-page="research" href="#research">
             <span class="nav-icon">🔍</span>
-            <span class="nav-label">Viral Research</span>
+            <span class="nav-label">Viral Search</span>
           </a>
           <a class="nav-item" data-page="library" href="#library">
             <span class="nav-icon">📚</span>
@@ -45,12 +45,16 @@
             <span class="nav-icon">🔗</span>
             <span class="nav-label">Nguồn nghiên cứu</span>
           </a>
+          <a class="nav-item" data-page="insights" href="#insights">
+            <span class="nav-icon">🧠</span>
+            <span class="nav-label">AI Insights</span>
+          </a>
         </div>
 
         <div class="nav-section">
           <div class="nav-section-label">NỘI DUNG</div>
           <a class="nav-item" data-page="campaigns" href="#campaigns">
-            <span class="nav-icon">🗓️</span>
+            <span class="nav-icon">📂</span>
             <span class="nav-label">Campaigns</span>
           </a>
           <a class="nav-item" data-page="ideas" href="#ideas">
@@ -91,7 +95,7 @@
     <main class="main-content" id="mainContent">
       <header class="topbar" id="topbar">
         <button class="topbar-menu" id="topbarMenu" aria-label="Mở menu">☰</button>
-        <div class="topbar-title" id="topbarTitle">Viral Research</div>
+        <div class="topbar-title" id="topbarTitle">Viral Search</div>
         <div class="topbar-actions">
           <button class="btn btn-ghost btn-sm" id="themeToggle" title="Đổi theme">🌙</button>
         </div>
@@ -135,13 +139,6 @@
   <script src="js/config.js"></script>
   <script src="js/state.js"></script>
 
-  <!-- Viral Research module (depends on core + utils) -->
-  <script src="modules/viral-research/data.js"></script>
-  <script src="modules/viral-research/viral-score.js"></script>
-  <script src="modules/viral-research/filters.js"></script>
-  <script src="modules/viral-research/cards.js"></script>
-  <script src="modules/viral-research/index.js"></script>
-
   <!-- IndexedDB adapter (no deps) -->
   <script src="js/db.js"></script>
 
@@ -153,8 +150,13 @@
   <script src="modules/library/cards.js"></script>
   <script src="modules/library/index.js"></script>
 
-  <!-- Research Sources module (no deps) -->
+  <!-- Research Sources module -->
   <script src="modules/research-sources/index.js"></script>
+
+  <!-- Viral Research module (depends on core, utils, LibraryStorage) -->
+  <script src="modules/viral-research/viral-score.js"></script>
+  <script src="modules/viral-research/cards.js"></script>
+  <script src="modules/viral-research/index.js"></script>
 
   <!-- Router + App init (must be last) -->
   <script src="js/router.js"></script>

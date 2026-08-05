@@ -22,9 +22,10 @@ const CONFIG = {
   ],
 
   pageNames: {
-    research:   'Viral Research',
+    research:   'Viral Search',
     library:    'Research Library',
     sources:    'Nguồn Nghiên Cứu',
+    insights:   'AI Insights',
     campaigns:  'Campaigns',
     ideas:      'Ideas Board',
     aiwriter:   'AI Content Writer',
