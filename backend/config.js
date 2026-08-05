@@ -26,5 +26,12 @@ module.exports = {
   },
 
   minViralScore: 30,
-  maxResults:    30
+  maxResults:    30,
+
+  /*
+   * Paid search gate — must be explicitly enabled via env var.
+   * When false (default), /api/research returns 403 and no connector is called.
+   * Set ENABLE_PAID_SEARCH=true only when TikHub credit is available.
+   */
+  enablePaidSearch: process.env.ENABLE_PAID_SEARCH === 'true'
 };

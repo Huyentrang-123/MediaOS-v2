@@ -6,6 +6,7 @@ const config  = require('./config');
 
 const researchRouter = require('./routes/research');
 const oembedRouter   = require('./routes/oembed');
+const variantsRouter = require('./routes/variants');
 
 const app    = express();
 const PUBLIC = path.join(__dirname, '..');
@@ -19,14 +20,17 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => {
   const hasKey = !!config.tikhub.apiKey;
   res.json({
-    status:    'ok',
-    tikhub:    hasKey ? 'configured' : 'missing_api_key',
-    timestamp: new Date().toISOString()
+    status:          'ok',
+    mode:            config.enablePaidSearch ? 'paid_search' : 'zero_cost',
+    enablePaidSearch: config.enablePaidSearch,
+    tikhub:          hasKey ? 'configured' : 'not_set',
+    timestamp:       new Date().toISOString()
   });
 });
 
 app.use('/api/research', researchRouter);
 app.use('/api/oembed',   oembedRouter);
+app.use('/api/variants', variantsRouter);
 
 /* Generic error handler */
 app.use((err, _req, res, _next) => {

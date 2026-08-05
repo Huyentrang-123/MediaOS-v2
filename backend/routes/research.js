@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const config  = require('../config');
 const search  = require('../services/search');
 
 const router = express.Router();
@@ -9,14 +10,19 @@ const VALID_PLATFORMS = ['tiktok', 'facebook'];
 const VALID_REGIONS   = ['global', 'vn', 'kr', 'cn', 'tw'];
 
 /*
- * GET /api/research?keyword=serum+nám&platform=tiktok&region=vn[&query=...&offset=0]
- * Response: { ok, count, data, fallback, hasMore, nextOffset, rawCount, returnedCount, variants }
- *   fallback=true  — no video met minViralScore; top results labeled "Kết quả tham khảo".
- *   hasMore        — whether the current query has more pages.
- *   nextOffset     — pass as `offset` on the next request to page forward.
- *   variants       — all localized query variants for this keyword+region (for "Tìm thêm gợi ý").
+ * GET /api/research?keyword=...&platform=tiktok&region=vn[&query=...&offset=0]
+ *
+ * REQUIRES ENABLE_PAID_SEARCH=true — disabled by default.
+ * When disabled, returns 403 immediately without touching any connector.
  */
 router.get('/', async (req, res, next) => {
+  if (!config.enablePaidSearch) {
+    return res.status(403).json({
+      error: 'Paid search is disabled (ENABLE_PAID_SEARCH=false). ' +
+             'Use /api/variants for free query expansion, or search the local Library.'
+    });
+  }
+
   try {
     const {
       keyword  = '',
@@ -61,7 +67,7 @@ router.get('/', async (req, res, next) => {
     });
   } catch (err) {
     if (err.code === 'TIKHUB_QUOTA_EXCEEDED') {
-      return res.status(402).json({ error: 'TikHub đã hết số dư hoặc free credit. Hãy Check-in hoặc nạp thêm credit.' });
+      return res.status(402).json({ error: 'TikHub hết số dư. Set ENABLE_PAID_SEARCH=false để dùng chế độ miễn phí.' });
     }
     if (err.code === 'TIKHUB_REGIONAL_UNAVAILABLE' || err.code === 'DOUYIN_UNAVAILABLE') {
       return res.status(503).json({ error: err.message });

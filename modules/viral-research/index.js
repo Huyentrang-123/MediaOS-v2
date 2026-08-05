@@ -1,69 +1,29 @@
 /* ============================================================
-   MediaOS — Viral Research: Module Entry
-   Search-first UX. No mode tabs. No import UI here.
+   MediaOS — Viral Research: Zero-Cost Search
+   Search = Library (IndexedDB) + free external links.
+   No TikHub, no paid API, no mock data.
    ============================================================ */
 
 'use strict';
 
-const BACKEND_URL = '';
-const SESSION_MAX = 50;
-
-/* ---- Session search state ---- */
-let _apiResults        = [];
-let _searchState       = 'idle';   // 'idle' | 'loading' | 'done' | 'error'
-let _fallback          = false;
-let _hasMore           = false;
-let _nextOffset        = null;
-let _queryVariants     = [];
-let _variantIndex      = 0;
-let _currentQuery      = null;
-let _seenIds           = new Set();
-let _totalAnalyzed     = 0;
-let _isLoadingMore     = false;
-let _isExpandingSearch = false;
-
-/* ---- Client-side display state (persists across searches) ---- */
-let _sortBy      = 'score';  // 'score' | 'views' | 'likes' | 'comments' | 'newest'
-let _filterDate  = 'all';   // 'all' | '7d' | '30d'
-let _filterViews = 'all';   // 'all' | '100k' | '1m'
+/* ---- Search state ---- */
+var _libraryResults = [];   // matched videos from IndexedDB
+var _queryVariants  = [];   // suggestion chips from vrAllVariants()
+var _searchState    = 'idle'; // 'idle' | 'searching' | 'done'
+var _sortBy         = 'score'; // 'score' | 'views' | 'newest'
+var _isSaving       = false;
 
 function _resetSearchState() {
-  _apiResults = []; _searchState = 'idle'; _fallback = false;
-  _hasMore = false; _nextOffset = null;
-  _queryVariants = []; _variantIndex = 0; _currentQuery = null;
-  _seenIds = new Set(); _totalAnalyzed = 0;
-  _isLoadingMore = false; _isExpandingSearch = false;
-}
-
-/* Map backend video → card format */
-function apiVideoToCard(v) {
-  const gr = v.stats?.growthRate;
-  return {
-    id:           v.id,
-    platform:     v.platform,
-    region:       v.region || '',
-    title:        v.caption || '(Không có tiêu đề)',
-    thumbnail:    v.thumbnail || '',
-    creator:      v.creatorHandle || v.creator || '',
-    postedDate:   v.postedAt ? v.postedAt.slice(0, 10) : '',
-    views:        v.stats?.views    || 0,
-    likes:        v.stats?.likes    || 0,
-    comments:     v.stats?.comments || 0,
-    shares:       v.stats?.shares   || 0,
-    viewsGrowth7d: gr ? parseFloat(gr) : null,
-    viralScore:   v.viral?.score || 0,
-    tags:         v.hashtags || [],
-    url:          v.url || '#',
-    matchedQuery: v.matchedQuery || '',
-    _reference:   v._reference || false
-  };
+  _libraryResults = [];
+  _queryVariants  = [];
+  _searchState    = 'idle';
 }
 
 /* ============================================================
-   RENDER — Main entry point
+   RENDER — main entry point
    ============================================================ */
 function renderResearch(container) {
-  const fs = state.viralResearch;
+  var fs = state.viralResearch;
 
   container.innerHTML =
     '<div class="vr-page">' +
@@ -72,50 +32,52 @@ function renderResearch(container) {
     '</div>';
 
   _bindSearchEvents();
+
   if (_searchState === 'done') {
-    _bindSortFilterEvents();
+    _bindSortEvents();
     _bindQueryChipEvents();
-    _bindLoadMoreEvents();
-    attachCardHandlers($('#vrGrid'), _apiResults);
+    _bindSaveEvents();
   }
+
+  /* Load Library stats into the idle placeholder */
+  if (_searchState === 'idle') _updateLibraryStats();
 }
 
 /* ============================================================
-   SEARCH SECTION (always visible)
+   SEARCH SECTION — always visible
    ============================================================ */
 function _buildSearchSection(fs) {
-  const platformOpts = [
+  var platformOpts = [
     { id: 'all',      icon: '',  label: 'Tất cả' },
     { id: 'tiktok',   icon: '♪', label: 'TikTok' },
-    { id: 'douyin',   icon: '抖', label: 'Douyin' },
     { id: 'facebook', icon: 'f', label: 'Facebook' }
   ];
 
-  const platformChips = platformOpts.map(function(p) {
+  var platformChips = platformOpts.map(function(p) {
     return '<button class="vr-chip' + (fs.platform === p.id ? ' active' : '') +
       '" data-platform="' + p.id + '">' +
       (p.icon ? '<span class="vr-chip-icon">' + p.icon + '</span>' : '') +
       p.label + '</button>';
   }).join('');
 
-  const regionChips = CONFIG.regions.map(function(r) {
+  var regionChips = CONFIG.regions.map(function(r) {
     return '<button class="vr-chip' + (fs.region === r.id ? ' active' : '') +
       '" data-region="' + r.id + '">' + r.label + '</button>';
   }).join('');
 
-  const isLoading = _searchState === 'loading';
+  var isSearching = _searchState === 'searching';
 
   return '<div class="vr-search-section">' +
     '<div class="vr-search-bar">' +
       '<div class="vr-search-input-wrap">' +
         '<span class="vr-search-icon">🔍</span>' +
         '<input type="text" id="vrKeyword" class="vr-search-input"' +
-          ' placeholder="Nhập từ khóa: serum viral, kem nám, before after..."' +
+          ' placeholder="Nhập từ khóa: serum nám, kem dưỡng, before after..."' +
           ' value="' + esc(fs.keyword) + '" autocomplete="off">' +
       '</div>' +
       '<button class="btn btn-primary vr-search-btn" id="vrSearchBtn"' +
-        (isLoading ? ' disabled' : '') + '>' +
-        (isLoading ? '⏳ Đang tìm...' : 'Phân tích') +
+        (isSearching ? ' disabled' : '') + '>' +
+        (isSearching ? '⏳ Đang tìm...' : 'Phân tích') +
       '</button>' +
     '</div>' +
     '<div class="vr-filter-row">' +
@@ -130,472 +92,380 @@ function _buildSearchSection(fs) {
 }
 
 /* ============================================================
-   RESULTS AREA
+   RESULTS AREA router
    ============================================================ */
 function _buildResultsArea() {
-  if (_searchState === 'idle')    return _buildIdleState();
-  if (_searchState === 'loading') return _buildLoadingState();
-  if (_searchState === 'error')   return '';
+  if (_searchState === 'idle')      return _buildIdleState();
+  if (_searchState === 'searching') return _buildSearchingState();
   return _buildResultsContent();
 }
 
 function _buildIdleState() {
-  const kw = (state.viralResearch.keyword || '').trim();
-  if (!kw) {
-    return '<div class="vr-empty">' +
-      '<div class="vr-empty-icon">🤖</div>' +
-      '<div class="vr-empty-title">AI Viral Research Engine</div>' +
-      '<div class="vr-empty-desc">Nhập từ khóa mỹ phẩm bạn muốn nghiên cứu, chọn nền tảng và khu vực, rồi bấm <strong>Phân tích</strong>.<br>' +
-      'AI sẽ tìm kiếm và xếp hạng video đáng nghiên cứu nhất từ TikTok, Douyin và Facebook.</div>' +
+  return '<div class="vr-free-badge">✅ Chế độ miễn phí · Không dùng TikHub credit</div>' +
+    '<div id="vrLibStats" class="vr-lib-stats"></div>' +
+    '<div class="vr-empty">' +
+      '<div class="vr-empty-icon">🔍</div>' +
+      '<div class="vr-empty-title">Tìm video trong Research Library</div>' +
+      '<div class="vr-empty-desc">' +
+        'Nhập từ khóa, chọn nền tảng và khu vực, rồi bấm <strong>Phân tích</strong>.<br>' +
+        'MediaOS tìm trong video đã lưu của đội và gợi ý nguồn nghiên cứu miễn phí.' +
+      '</div>' +
     '</div>';
-  }
-  return '<div class="vr-empty">' +
-    '<div class="vr-empty-icon">▶</div>' +
-    '<div class="vr-empty-title">Bấm "Phân tích" để bắt đầu</div>' +
-    '<div class="vr-empty-desc">Từ khóa: <strong>' + esc(kw) + '</strong></div>' +
-  '</div>';
 }
 
-function _buildLoadingState() {
-  const kw = (state.viralResearch.keyword || '').trim();
-  const provider = state.viralResearch.region === 'cn' ? 'Douyin' : 'TikTok';
+function _buildSearchingState() {
   return '<div class="vr-empty">' +
     '<div class="vr-empty-icon">⏳</div>' +
-    '<div class="vr-empty-title">Đang phân tích video ' + provider + '...</div>' +
-    '<div class="vr-empty-desc">Thu thập và xếp hạng video với từ khóa <strong>' + esc(kw) + '</strong></div>' +
+    '<div class="vr-empty-title">Đang tìm trong Library...</div>' +
+    '<div class="vr-empty-desc">Tìm kiếm cục bộ — không gọi API nào.</div>' +
   '</div>';
 }
 
+/* ============================================================
+   RESULTS CONTENT — after search
+   Order: badge → summary → sort → library grid → query chips
+          → external sources → save panel
+   ============================================================ */
 function _buildResultsContent() {
-  const filtered = _getFilteredResults();
-  const html = [];
+  var kw       = state.viralResearch.keyword;
+  var fs       = state.viralResearch;
+  var sorted   = _sortResults(_libraryResults);
+  var total    = _libraryResults.length;
+  var html     = [];
 
-  html.push(_buildSummaryRow(filtered.length));
+  /* Free mode badge */
+  html.push('<div class="vr-free-badge">✅ Chế độ miễn phí · Không dùng TikHub credit</div>');
 
-  if (_queryVariants.length > 1) html.push(_buildQueryChips());
+  /* Summary */
+  html.push(
+    '<div class="vr-summary">' +
+    'Tìm thấy <strong>' + total + '</strong> video trong Library phù hợp với ' +
+    '"<strong>' + esc(kw) + '</strong>"' +
+    '</div>'
+  );
 
-  html.push(_buildSortFilterBar());
-
-  if (filtered.length === 0) {
-    html.push('<div class="vr-empty">' +
-      '<div class="vr-empty-icon">🔍</div>' +
-      '<div class="vr-empty-title">Không có video phù hợp bộ lọc này</div>' +
-      '<div class="vr-empty-desc">Thay đổi bộ lọc hoặc tìm từ khóa khác.</div>' +
+  /* Library results */
+  if (total > 0) {
+    html.push(_buildLibrarySortBar());
+    html.push('<div class="vr-grid" id="vrGrid">' +
+      sorted.map(function(v) { return _renderLibraryCard(v); }).join('') +
     '</div>');
   } else {
-    html.push('<div class="vr-grid" id="vrGrid">' +
-      filtered.map(function(v) { return renderVideoCard(v); }).join('') +
-    '</div>');
+    html.push(
+      '<div class="vr-lib-empty">' +
+        '<div class="vr-empty-icon">📚</div>' +
+        '<div class="vr-empty-title">Thư viện chưa có video phù hợp</div>' +
+        '<div class="vr-empty-desc">Hãy mở nguồn nghiên cứu bên dưới, tìm video và lưu link vào MediaOS.</div>' +
+      '</div>'
+    );
   }
 
-  html.push(_buildLoadMoreBar());
+  /* Query suggestion chips */
+  if (_queryVariants.length > 1) html.push(_buildQueryChips());
+
+  /* External sources */
+  html.push(_buildExternalSources(kw, fs.platform, fs.region));
+
+  /* Save link panel */
+  html.push(_buildSavePanel());
 
   return html.join('');
 }
 
-/* ---- Summary Row ---- */
-function _buildSummaryRow(shown) {
-  const total    = _apiResults.length;
-  const topScore = total > 0 ? Math.max.apply(null, _apiResults.map(function(v) { return v.viralScore || 0; })) : 0;
-  const refCount = _apiResults.filter(function(v) { return v._reference; }).length;
-  const viral    = total - refCount;
-
-  const parts = [
-    'Đã phân tích <strong>' + _totalAnalyzed + '</strong> video',
-    'AI chọn <strong>' + viral + '</strong> đáng nghiên cứu' +
-      (refCount > 0 ? ' · <span class="vr-ref-note">+' + refCount + ' tham khảo</span>' : ''),
-    'Score cao nhất <strong>' + topScore + '/100</strong>'
+/* ---- Sort bar for Library results ---- */
+function _buildLibrarySortBar() {
+  var sorts = [
+    { id: 'score',  label: 'Viral Score' },
+    { id: 'views',  label: 'Views' },
+    { id: 'newest', label: 'Mới nhất' }
   ];
-
-  if (shown < total) {
-    parts.push('Đang hiển thị <strong>' + shown + '</strong>/' + total + ' sau lọc');
-  }
-
-  return '<div class="vr-summary" id="vrSummary">' +
-    parts.join('<span class="vr-summary-sep">·</span>') +
+  return '<div class="vr-sort-bar" id="vrSortBar">' +
+    '<div class="vr-sort-group">' +
+      '<span class="vr-sort-label">Sắp xếp</span>' +
+      sorts.map(function(s) {
+        return '<button class="vr-sort-btn' + (_sortBy === s.id ? ' active' : '') +
+          '" data-sort="' + s.id + '">' + s.label + '</button>';
+      }).join('') +
+    '</div>' +
   '</div>';
 }
 
-function _updateSummaryRow() {
-  const el = $('#vrSummary');
-  if (!el) return;
-  const filtered = _getFilteredResults();
-  el.outerHTML = _buildSummaryRow(filtered.length);
+/* ---- Library card (inline in Viral Search) ---- */
+function _renderLibraryCard(entry) {
+  var scoreInfo = getScoreLabel(entry.viralScore || 0);
+  var flagMap   = { vn: '🇻🇳', kr: '🇰🇷', cn: '🇨🇳', tw: '🇹🇼' };
+  var iconMap   = { tiktok: '♪', facebook: 'f', douyin: '抖' };
+  var flag      = flagMap[entry.region] || '';
+  var icon      = iconMap[entry.platform] || '▶';
+  var platform  = entry.platform === 'tiktok'   ? 'TikTok'
+                : entry.platform === 'douyin'   ? 'Douyin'
+                : entry.platform === 'facebook' ? 'Facebook'
+                : (entry.platform || '');
+  var ago       = entry.postedAt ? timeAgo(entry.postedAt.slice(0, 10)) : '';
+  var score     = entry.viralScore != null ? entry.viralScore
+                : (LibraryAnalysis ? LibraryAnalysis.estimateViralScore(entry) : null);
+
+  var thumb = entry.thumbnail
+    ? '<img src="' + esc(entry.thumbnail) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+    : '<div class="vr-thumb-placeholder">' + icon + '</div>';
+
+  return '<div class="vr-card">' +
+    '<div class="vr-thumb">' +
+      thumb +
+      '<div class="vr-platform ' + esc(entry.platform || '') + '">' +
+        '<span>' + icon + '</span>' +
+        '<span>' + platform + '</span>' +
+      '</div>' +
+      (score != null ? '<div class="vr-score-badge' + (score >= 85 ? ' hot' : '') + '">' + score + '/100</div>' : '') +
+    '</div>' +
+    '<div class="vr-body">' +
+      '<a class="vr-title" href="' + esc(entry.url || '#') + '" target="_blank" rel="noopener noreferrer">' +
+        esc(entry.title || '(Chưa có tiêu đề)') +
+      '</a>' +
+      '<div class="vr-meta">' +
+        (flag ? '<span class="vr-flag">' + flag + '</span>' : '') +
+        '<span class="vr-creator" title="' + esc(entry.creator || '') + '">' + esc(entry.creator || '') + '</span>' +
+        '<span class="vr-meta-date">' + ago + '</span>' +
+      '</div>' +
+      '<div class="vr-stats">' +
+        (entry.views    ? '<span class="vr-stat-item">👁 '  + formatNumber(entry.views)    + '</span>' : '') +
+        (entry.likes    ? '<span class="vr-stat-item">❤ '   + formatNumber(entry.likes)    + '</span>' : '') +
+        (entry.comments ? '<span class="vr-stat-item">💬 ' + formatNumber(entry.comments) + '</span>' : '') +
+        (entry.shares   ? '<span class="vr-stat-item">↗ '   + formatNumber(entry.shares)   + '</span>' : '') +
+      '</div>' +
+      '<div class="vr-badges">' +
+        (score != null ? '<span class="badge ' + scoreInfo.cls + '">' + scoreInfo.label + '</span>' : '') +
+        '<span class="badge badge-gray">📚 Library</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="vr-actions">' +
+      '<a class="vr-btn-watch" href="' + esc(entry.url || '#') + '" target="_blank" rel="noopener noreferrer">Xem video</a>' +
+      '<span class="vr-btn-save saved" title="Đã có trong Library">⭐ Đã lưu</span>' +
+    '</div>' +
+  '</div>';
 }
 
-/* ---- Query Suggestion Chips ---- */
+/* ---- Query suggestion chips ---- */
 function _buildQueryChips() {
-  const variants = _queryVariants.slice(1, 9);
-  if (variants.length === 0) return '';
+  var chips = _queryVariants.slice(1, 9);
+  if (chips.length === 0) return '';
   return '<div class="vr-suggestions">' +
-    '<span class="vr-suggestions-label">Có thể bạn muốn tìm:</span>' +
-    variants.map(function(q) {
+    '<span class="vr-suggestions-label">Tìm thêm với:</span>' +
+    chips.map(function(q) {
       return '<button class="vr-suggestion-chip" data-query="' + esc(q) + '">' + esc(q) + '</button>';
     }).join('') +
   '</div>';
 }
 
-/* ---- Sort / Filter Bar ---- */
-function _buildSortFilterBar() {
-  const sorts = [
-    { id: 'score',    label: 'Viral Score' },
-    { id: 'views',    label: 'Views' },
-    { id: 'likes',    label: 'Likes' },
-    { id: 'comments', label: 'Bình luận' },
-    { id: 'newest',   label: 'Mới nhất' }
-  ];
-  const dateFils = [
-    { id: 'all', label: 'Mọi thời gian' },
-    { id: '7d',  label: '7 ngày' },
-    { id: '30d', label: '30 ngày' }
-  ];
-  const viewFils = [
-    { id: 'all',  label: 'Mọi views' },
-    { id: '100k', label: '>100K' },
-    { id: '1m',   label: '>1M' }
-  ];
+/* ---- External search sources ---- */
+function _buildExternalSources(keyword, platform, region) {
+  var localQ  = vrLocalizeQuery(keyword, region);
+  var qOrig   = encodeURIComponent(keyword);
+  var qLoc    = encodeURIComponent(localQ);
 
-  function mkGroup(label, items, attr) {
-    return '<div class="vr-sort-group">' +
-      '<span class="vr-sort-label">' + label + '</span>' +
-      items.map(function(f) {
-        let active;
-        if (attr === 'sort')  active = _sortBy === f.id;
-        if (attr === 'date')  active = _filterDate === f.id;
-        if (attr === 'views') active = _filterViews === f.id;
-        return '<button class="vr-sort-btn' + (active ? ' active' : '') +
-          '" data-' + attr + '="' + f.id + '">' + f.label + '</button>';
-      }).join('') +
-    '</div>';
+  /* CN-localized query (for Douyin even when region != cn) */
+  var qCN  = region === 'cn' ? qLoc : encodeURIComponent(vrLocalizeQuery(keyword, 'cn'));
+  var qVN  = encodeURIComponent(keyword);
+
+  var isTK  = platform === 'all' || platform === 'tiktok';
+  var isFB  = platform === 'all' || platform === 'facebook';
+  var isDY  = platform === 'douyin' || region === 'cn';
+  var showDY = isDY || region === 'global' || region === 'cn';
+
+  var sources = [];
+
+  if (isTK && region !== 'cn') {
+    sources.push({ icon: '♪',  label: 'TikTok Search',          url: 'https://www.tiktok.com/search?q=' + qLoc });
+    sources.push({ icon: '🎯', label: 'TikTok Creative Center',  url: 'https://ads.tiktok.com/business/creativecenter/inspiration/topads/pc/en' });
   }
+  if (showDY) {
+    sources.push({ icon: '抖', label: 'Douyin Search',           url: 'https://www.douyin.com/search/' + qCN });
+  }
+  if (isFB) {
+    sources.push({ icon: 'f',  label: 'Facebook Videos',         url: 'https://www.facebook.com/search/videos/?q=' + qLoc });
+    sources.push({ icon: '📢', label: 'Facebook Ad Library',     url: 'https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=' + qLoc + '&search_type=keyword_unordered' });
+  }
+  sources.push({ icon: '🔎', label: 'Google × TikTok',          url: 'https://www.google.com/search?q=site%3Atiktok.com+' + qLoc });
+  sources.push({ icon: '🔎', label: 'Google × FB Reels',        url: 'https://www.google.com/search?q=site%3Afacebook.com%2Freel+' + qLoc });
 
-  return '<div class="vr-sort-bar" id="vrSortBar">' +
-    mkGroup('Sắp xếp', sorts, 'sort') +
-    mkGroup('Thời gian', dateFils, 'date') +
-    mkGroup('Views', viewFils, 'views') +
+  var btnHtml = sources.map(function(s) {
+    return '<a class="vr-ext-btn" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' +
+      '<span class="vr-ext-icon">' + s.icon + '</span>' +
+      '<span>' + esc(s.label) + '</span>' +
+    '</a>';
+  }).join('');
+
+  var localNote = localQ !== keyword
+    ? ' · Từ khóa: <strong>' + esc(localQ) + '</strong>'
+    : '';
+
+  return '<div class="vr-ext-sources">' +
+    '<div class="vr-section-title">🔗 Nguồn nghiên cứu miễn phí</div>' +
+    '<div class="vr-ext-note">Bấm để mở trang tìm kiếm — tìm video, sau đó dán link vào ô bên dưới để lưu.' + localNote + '</div>' +
+    '<div class="vr-ext-btns">' + btnHtml + '</div>' +
   '</div>';
 }
 
-/* ---- Client-side filter + sort ---- */
-function _getFilteredResults() {
-  const fs = state.viralResearch;
-  let results = _apiResults.slice();
-
-  if (fs.platform !== 'all') {
-    const inc = fs.platform === 'tiktok' ? ['tiktok', 'douyin'] : [fs.platform];
-    results = results.filter(function(v) { return inc.includes(v.platform); });
-  }
-
-  if (fs.region !== 'global') {
-    results = results.filter(function(v) { return v.region === fs.region; });
-  }
-
-  if (_filterDate !== 'all') {
-    const days   = _filterDate === '7d' ? 7 : 30;
-    const cutoff = Date.now() - days * 86400 * 1000;
-    results = results.filter(function(v) {
-      return v.postedDate && new Date(v.postedDate).getTime() > cutoff;
-    });
-  }
-
-  if (_filterViews === '100k')  results = results.filter(function(v) { return v.views >= 100000; });
-  if (_filterViews === '1m')    results = results.filter(function(v) { return v.views >= 1000000; });
-
-  results.sort(function(a, b) {
-    if (_sortBy === 'views')    return b.views    - a.views;
-    if (_sortBy === 'likes')    return b.likes    - a.likes;
-    if (_sortBy === 'comments') return b.comments - a.comments;
-    if (_sortBy === 'newest')   return new Date(b.postedDate) - new Date(a.postedDate);
-    return b.viralScore - a.viralScore;
-  });
-
-  return results;
-}
-
-/* ---- Load More Bar ---- */
-function _buildLoadMoreBar() {
-  const atMax         = _apiResults.length >= SESSION_MAX;
-  const noMorePages   = !_hasMore || _nextOffset === null;
-  const noMoreVars    = _variantIndex >= _queryVariants.length - 1;
-  const variantsLeft  = _queryVariants.length - 1 - _variantIndex;
-
-  if (atMax) {
-    return '<div class="vr-loadmore-bar"><span class="vr-loadmore-note">Đã đạt giới hạn ' + SESSION_MAX + ' video / phiên</span></div>';
-  }
-
-  return '<div class="vr-loadmore-bar" id="vrLoadMoreBar">' +
-    '<div class="vr-loadmore-stats" id="vrLoadStats">' +
-      'Đã tải ' + _apiResults.length + '/' + SESSION_MAX + ' video' +
-      (variantsLeft > 0 ? ' · ' + variantsLeft + ' hướng tìm kiếm chưa khám phá' : '') +
+/* ---- Save link panel ---- */
+function _buildSavePanel() {
+  return '<div class="vr-save-panel" id="vrSavePanel">' +
+    '<div class="vr-section-title">💾 Lưu link video về MediaOS</div>' +
+    '<div class="vr-save-desc">Dán link TikTok / Facebook / Douyin — mỗi dòng một link, hoặc import CSV</div>' +
+    '<textarea id="vrSaveInput" class="vr-save-textarea" rows="3"' +
+    ' placeholder="https://www.tiktok.com/@creator/video/123&#10;https://www.facebook.com/reel/456"></textarea>' +
+    '<div class="vr-save-actions">' +
+      '<button id="vrSaveBtn" class="btn btn-primary btn-sm">Lưu vào Library</button>' +
+      '<label class="btn btn-outline btn-sm vr-csv-label" for="vrSaveCsvFile">Import CSV</label>' +
+      '<input type="file" id="vrSaveCsvFile" accept=".csv" style="display:none">' +
+      '<span id="vrSaveStatus" class="vr-save-status"></span>' +
     '</div>' +
-    '<div class="vr-loadmore-btns">' +
-      '<button id="vrLoadMoreBtn" class="btn btn-secondary"' + (noMorePages ? ' disabled' : '') + '>' +
-        '↓ Xem thêm' +
-      '</button>' +
-      '<button id="vrExpandBtn" class="btn btn-outline"' + (noMoreVars ? ' disabled' : '') + '>' +
-        '🔍 Tìm thêm gợi ý' +
-      '</button>' +
-    '</div>' +
-    '<div id="vrLoadError" class="vr-load-error" style="display:none"></div>' +
   '</div>';
 }
 
-function _updateLoadMoreButtons() {
-  const loadBtn  = $('#vrLoadMoreBtn');
-  const expandBtn = $('#vrExpandBtn');
-  const statsEl  = $('#vrLoadStats');
-  if (!loadBtn || !expandBtn) return;
+/* ---- Library stats (shown in idle state) ---- */
+async function _updateLibraryStats() {
+  var el = $('#vrLibStats');
+  if (!el) return;
+  try {
+    var all      = await LibraryStorage.getAll();
+    var total    = all.length;
+    var tiktok   = all.filter(function(v) { return v.platform === 'tiktok' || v.platform === 'douyin'; }).length;
+    var facebook = all.filter(function(v) { return v.platform === 'facebook'; }).length;
+    var scores   = all.map(function(v) { return v.viralScore || 0; }).filter(function(s) { return s > 0; });
+    var topScore = scores.length > 0 ? Math.max.apply(null, scores) : null;
 
-  const atMax        = _apiResults.length >= SESSION_MAX;
-  const noMorePages  = !_hasMore || _nextOffset === null;
-  const noMoreVars   = _variantIndex >= _queryVariants.length - 1;
-  const variantsLeft = _queryVariants.length - 1 - _variantIndex;
+    if (total === 0) {
+      el.innerHTML = '<div class="vr-lib-stat-empty">Library trống — chưa có video nào. Lưu link từ nguồn nghiên cứu để bắt đầu.</div>';
+      return;
+    }
 
-  if (atMax) {
-    loadBtn.style.display   = 'none';
-    expandBtn.style.display = 'none';
-    if (statsEl) statsEl.textContent = 'Đã đạt giới hạn ' + SESSION_MAX + ' video / phiên';
-    return;
-  }
-
-  if (statsEl) {
-    statsEl.textContent = 'Đã tải ' + _apiResults.length + '/' + SESSION_MAX + ' video' +
-      (variantsLeft > 0 ? ' · ' + variantsLeft + ' hướng tìm kiếm chưa khám phá' : '');
-  }
-
-  loadBtn.disabled    = _isLoadingMore   || noMorePages;
-  expandBtn.disabled  = _isExpandingSearch || noMoreVars;
-  loadBtn.textContent  = _isLoadingMore    ? '⏳ Đang tải...' : '↓ Xem thêm';
-  expandBtn.textContent = _isExpandingSearch ? '⏳ Đang tìm...' : '🔍 Tìm thêm gợi ý';
+    el.innerHTML =
+      '<div class="vr-lib-stat"><div class="vr-lib-stat-val">' + total + '</div><div class="vr-lib-stat-label">Tổng video</div></div>' +
+      '<div class="vr-lib-stat"><div class="vr-lib-stat-val">' + tiktok + '</div><div class="vr-lib-stat-label">TikTok / Douyin</div></div>' +
+      '<div class="vr-lib-stat"><div class="vr-lib-stat-val">' + facebook + '</div><div class="vr-lib-stat-label">Facebook</div></div>' +
+      (topScore != null ? '<div class="vr-lib-stat"><div class="vr-lib-stat-val">' + topScore + '/100</div><div class="vr-lib-stat-label">Viral Score cao nhất</div></div>' : '');
+  } catch (e) { /* ignore */ }
 }
 
 /* ============================================================
-   FULL RE-RENDER (filter/sort changes)
+   LIBRARY SEARCH
    ============================================================ */
-function _rerenderResults() {
-  const container = $('#vrResults');
-  if (!container) return;
-  container.innerHTML = _buildResultsContent();
-  _bindSortFilterEvents();
-  _bindQueryChipEvents();
-  _bindLoadMoreEvents();
-  attachCardHandlers($('#vrGrid'), _apiResults);
-}
+function _searchLibrary(videos, keyword, platform, region) {
+  var kw     = keyword.toLowerCase();
+  var kwNorm = vrNormVi(kw);
+  var syns   = vrGetSynonyms(kw); /* cross-language synonyms */
 
-/* ============================================================
-   APPEND (load-more without full re-render)
-   ============================================================ */
-function _appendVideoCards(newVideos) {
-  const bar  = $('#vrLoadMoreBar');
-  const grid = $('#vrGrid');
-  if (!bar || !grid) { _rerenderResults(); return; }
+  return videos.filter(function(v) {
+    /* Platform filter */
+    if (platform !== 'all') {
+      var pMatch = platform === 'tiktok'
+        ? (v.platform === 'tiktok' || v.platform === 'douyin')
+        : v.platform === platform;
+      if (!pMatch) return false;
+    }
 
-  /* Only append cards that pass current filters */
-  const fs = state.viralResearch;
-  const visible = newVideos.filter(function(v) {
-    if (fs.platform !== 'all') {
-      const inc = fs.platform === 'tiktok' ? ['tiktok', 'douyin'] : [fs.platform];
-      if (!inc.includes(v.platform)) return false;
+    /* Region filter */
+    if (region !== 'global' && v.region && v.region !== region) return false;
+
+    /* Build searchable text from all fields */
+    var text = [
+      v.title, v.creator, v.creatorHandle,
+      v.notes, v.hook, v.cta,
+      v.matchedQuery, v.localizedKeyword,
+      (v.topics      || []).join(' '),
+      (v.contentTags || []).join(' ')
+    ].filter(Boolean).join(' ');
+
+    var textLow  = text.toLowerCase();
+    var textNorm = vrNormVi(text);
+
+    /* Direct match (diacritic-insensitive) */
+    if (textNorm.indexOf(kwNorm) !== -1 || textLow.indexOf(kw) !== -1) return true;
+
+    /* Cross-language synonym match */
+    for (var i = 0; i < syns.length; i++) {
+      if (textLow.indexOf(syns[i]) !== -1) return true;
     }
-    if (fs.region !== 'global' && v.region !== fs.region) return false;
-    if (_filterDate !== 'all') {
-      const days   = _filterDate === '7d' ? 7 : 30;
-      const cutoff = Date.now() - days * 86400 * 1000;
-      if (!v.postedDate || new Date(v.postedDate).getTime() <= cutoff) return false;
-    }
-    if (_filterViews === '100k' && v.views < 100000)  return false;
-    if (_filterViews === '1m'   && v.views < 1000000) return false;
-    return true;
+
+    return false;
   });
-
-  if (visible.length > 0) {
-    const temp = document.createElement('div');
-    temp.innerHTML = visible.map(function(v) { return renderVideoCard(v); }).join('');
-    attachCardHandlers(temp, _apiResults);
-
-    const firstNew = temp.firstElementChild;
-    while (temp.firstChild) bar.parentNode.insertBefore(temp.firstChild, bar);
-    if (firstNew) firstNew.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  _updateSummaryRow();
-  _updateLoadMoreButtons();
 }
 
-function _showLoadError(msg) {
-  const el = $('#vrLoadError');
-  if (el) { el.textContent = msg; el.style.display = 'block'; setTimeout(function() { if (el) el.style.display = 'none'; }, 6000); }
+function _sortResults(videos) {
+  var arr = videos.slice();
+  if (_sortBy === 'views')  return arr.sort(function(a, b) { return (b.views || 0) - (a.views || 0); });
+  if (_sortBy === 'newest') return arr.sort(function(a, b) {
+    return new Date(b.postedAt || b.addedAt || 0) - new Date(a.postedAt || a.addedAt || 0);
+  });
+  return arr.sort(function(a, b) { return (b.viralScore || 0) - (a.viralScore || 0); });
 }
 
 /* ============================================================
-   SEARCH (first search from button)
+   DO SEARCH (zero-cost — IndexedDB only)
    ============================================================ */
 async function _doSearch() {
-  const input = $('#vrKeyword');
+  var input = $('#vrKeyword');
   if (input) {
     state.viralResearch.keyword = input.value;
     saveState();
   }
 
-  const kw = (state.viralResearch.keyword || '').trim();
+  var kw = (state.viralResearch.keyword || '').trim();
   if (!kw) return;
-  if (_searchState === 'loading') return;
+  if (_searchState === 'searching') return;
+
+  var fs = state.viralResearch;
 
   _resetSearchState();
-  _searchState = 'loading';
+  _searchState = 'searching';
 
-  /* Show loading state */
-  const searchBtn = $('#vrSearchBtn');
-  if (searchBtn) { searchBtn.disabled = true; searchBtn.textContent = '⏳ Đang tìm...'; }
-  const resultsEl = $('#vrResults');
-  if (resultsEl) resultsEl.innerHTML = _buildLoadingState();
+  var btn = $('#vrSearchBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang tìm...'; }
 
-  const fs       = state.viralResearch;
-  const platform = (fs.platform === 'all' || fs.platform === 'facebook') ? 'tiktok' : fs.platform;
+  var resultsEl = $('#vrResults');
+  if (resultsEl) resultsEl.innerHTML = _buildSearchingState();
 
   try {
-    const params = new URLSearchParams({ keyword: kw, platform, region: fs.region });
-    const resp   = await fetch(BACKEND_URL + '/api/research?' + params);
-    if (!resp.ok) {
-      const e = await resp.json().catch(function() { return {}; });
-      throw new Error(e.error || 'HTTP ' + resp.status);
-    }
-    const json  = await resp.json();
-    const cards = (json.data || []).map(apiVideoToCard);
-    cards.forEach(function(v) { _seenIds.add(String(v.id)); _apiResults.push(v); });
-
-    _fallback      = json.fallback   || false;
-    _hasMore       = json.hasMore    || false;
-    _nextOffset    = json.nextOffset ?? null;
-    _queryVariants = json.variants   || [];
-    _variantIndex  = 0;
-    _currentQuery  = _queryVariants[0] || kw;
-    _totalAnalyzed = json.rawCount   || cards.length;
-    _searchState   = 'done';
+    var allVideos = await LibraryStorage.getAll();
+    _libraryResults = _searchLibrary(allVideos, kw, fs.platform, fs.region);
+    _queryVariants  = vrAllVariants(kw, fs.region);
+    _searchState    = 'done';
   } catch (err) {
     console.error('[VR] search error:', err);
-    _searchState = 'error';
-    if (resultsEl) {
-      resultsEl.innerHTML = '<div class="vr-empty">' +
-        '<div class="vr-empty-icon">⚠️</div>' +
-        '<div class="vr-empty-title">Không tải được kết quả</div>' +
-        '<div class="vr-empty-desc">' + esc(err.message) + '</div>' +
-      '</div>';
-    }
+    _searchState = 'idle';
+    toast('Lỗi tìm kiếm: ' + err.message, 'error');
   } finally {
-    if (searchBtn) { searchBtn.disabled = false; searchBtn.textContent = 'Phân tích'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Phân tích'; }
   }
 
   if (_searchState === 'done') _rerenderResults();
 }
 
 /* ============================================================
-   LOAD MORE (paginate current query)
+   RE-RENDER
    ============================================================ */
-async function loadMore() {
-  if (_isLoadingMore || !_hasMore || _nextOffset === null || _apiResults.length >= SESSION_MAX) return;
-  _isLoadingMore = true;
-  _updateLoadMoreButtons();
-
-  const fs       = state.viralResearch;
-  const platform = (fs.platform === 'all' || fs.platform === 'facebook') ? 'tiktok' : fs.platform;
-
-  try {
-    const params = new URLSearchParams({
-      keyword: fs.keyword.trim(),
-      platform,
-      region:  fs.region,
-      query:   _currentQuery || '',
-      offset:  String(_nextOffset)
-    });
-    const resp = await fetch(BACKEND_URL + '/api/research?' + params);
-    if (!resp.ok) {
-      const e = await resp.json().catch(function() { return {}; });
-      throw new Error(e.error || 'HTTP ' + resp.status);
-    }
-    const json     = await resp.json();
-    const newCards = (json.data || []).map(apiVideoToCard);
-    const fresh    = newCards.filter(function(v) { return !_seenIds.has(String(v.id)); });
-    fresh.forEach(function(v) { _seenIds.add(String(v.id)); _apiResults.push(v); });
-
-    _hasMore       = json.hasMore  || false;
-    _nextOffset    = json.nextOffset ?? null;
-    _totalAnalyzed += json.rawCount || 0;
-
-    _appendVideoCards(fresh);
-  } catch (err) {
-    console.error('[VR] loadMore error:', err);
-    _showLoadError(err.message);
-  } finally {
-    _isLoadingMore = false;
-    _updateLoadMoreButtons();
-  }
-}
-
-/* ============================================================
-   EXPAND SEARCH (fetch next query variant)
-   ============================================================ */
-async function expandSearch() {
-  const nextIdx = _variantIndex + 1;
-  if (_isExpandingSearch || nextIdx >= _queryVariants.length || _apiResults.length >= SESSION_MAX) return;
-  _isExpandingSearch = true;
-  _updateLoadMoreButtons();
-
-  const nextQuery = _queryVariants[nextIdx];
-  const fs        = state.viralResearch;
-  const platform  = (fs.platform === 'all' || fs.platform === 'facebook') ? 'tiktok' : fs.platform;
-
-  try {
-    const params = new URLSearchParams({
-      keyword: fs.keyword.trim(),
-      platform,
-      region:  fs.region,
-      query:   nextQuery,
-      offset:  '0'
-    });
-    const resp = await fetch(BACKEND_URL + '/api/research?' + params);
-    if (!resp.ok) {
-      const e = await resp.json().catch(function() { return {}; });
-      throw new Error(e.error || 'HTTP ' + resp.status);
-    }
-    const json     = await resp.json();
-    const newCards = (json.data || []).map(apiVideoToCard);
-    const fresh    = newCards.filter(function(v) { return !_seenIds.has(String(v.id)); });
-    fresh.forEach(function(v) { _seenIds.add(String(v.id)); _apiResults.push(v); });
-
-    _variantIndex  = nextIdx;
-    _currentQuery  = nextQuery;
-    _hasMore       = json.hasMore  || false;
-    _nextOffset    = json.nextOffset ?? null;
-    _totalAnalyzed += json.rawCount || 0;
-
-    if (fresh.length > 0) {
-      _appendVideoCards(fresh);
-    } else {
-      _showLoadError('Không tìm thấy video mới cho "' + nextQuery + '"');
-    }
-    _updateLoadMoreButtons();
-  } catch (err) {
-    console.error('[VR] expandSearch error:', err);
-    _showLoadError(err.message);
-  } finally {
-    _isExpandingSearch = false;
-    _updateLoadMoreButtons();
-  }
+function _rerenderResults() {
+  var el = $('#vrResults');
+  if (!el) return;
+  el.innerHTML = _buildResultsContent();
+  _bindSortEvents();
+  _bindQueryChipEvents();
+  _bindSaveEvents();
 }
 
 /* ============================================================
    EVENT BINDING
    ============================================================ */
 function _bindSearchEvents() {
-  const searchBtn = $('#vrSearchBtn');
-  if (searchBtn) searchBtn.addEventListener('click', _doSearch);
+  var btn = $('#vrSearchBtn');
+  if (btn) btn.addEventListener('click', _doSearch);
 
-  const input = $('#vrKeyword');
+  var input = $('#vrKeyword');
   if (input) {
     input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') _doSearch();
     });
+
     /* Focus shortcut: / or Ctrl+K */
     document.addEventListener('keydown', function _kh(e) {
       if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && document.activeElement !== input) {
@@ -605,51 +475,42 @@ function _bindSearchEvents() {
     });
   }
 
-  /* Platform chips — re-filter cached results immediately */
+  /* Platform chips */
   $$('#platformChips .vr-chip').forEach(function(chip) {
     chip.addEventListener('click', function() {
       state.viralResearch.platform = chip.dataset.platform;
       $$('#platformChips .vr-chip').forEach(function(c) {
         c.classList.toggle('active', c.dataset.platform === chip.dataset.platform);
       });
-      if (_searchState === 'done') _rerenderResults();
+      if (_searchState === 'done') _doSearch();
     });
   });
 
-  /* Region chips — re-filter cached results immediately */
+  /* Region chips */
   $$('#regionChips .vr-chip').forEach(function(chip) {
     chip.addEventListener('click', function() {
       state.viralResearch.region = chip.dataset.region;
       $$('#regionChips .vr-chip').forEach(function(c) {
         c.classList.toggle('active', c.dataset.region === chip.dataset.region);
       });
-      if (_searchState === 'done') _rerenderResults();
+      if (_searchState === 'done') _doSearch();
     });
   });
 }
 
-function _bindSortFilterEvents() {
-  /* Sort buttons */
+function _bindSortEvents() {
   $$('[data-sort]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       _sortBy = btn.dataset.sort;
-      _rerenderResults();
-    });
-  });
-
-  /* Date filter */
-  $$('[data-date]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      _filterDate = btn.dataset.date;
-      _rerenderResults();
-    });
-  });
-
-  /* Views filter */
-  $$('[data-views]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      _filterViews = btn.dataset.views;
-      _rerenderResults();
+      var sorted = _sortResults(_libraryResults);
+      var grid   = $('#vrGrid');
+      if (grid) {
+        grid.innerHTML = sorted.map(function(v) { return _renderLibraryCard(v); }).join('');
+      }
+      /* Update active button */
+      $$('[data-sort]').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.sort === _sortBy);
+      });
     });
   });
 }
@@ -657,19 +518,104 @@ function _bindSortFilterEvents() {
 function _bindQueryChipEvents() {
   $$('.vr-suggestion-chip').forEach(function(chip) {
     chip.addEventListener('click', function() {
-      const query = chip.dataset.query;
+      var query = chip.dataset.query;
       state.viralResearch.keyword = query;
       saveState();
-      const input = $('#vrKeyword');
+      var input = $('#vrKeyword');
       if (input) input.value = query;
       _doSearch();
     });
   });
 }
 
-function _bindLoadMoreEvents() {
-  const loadBtn   = $('#vrLoadMoreBtn');
-  const expandBtn = $('#vrExpandBtn');
-  if (loadBtn)   loadBtn.addEventListener('click', loadMore);
-  if (expandBtn) expandBtn.addEventListener('click', expandSearch);
+function _bindSaveEvents() {
+  var btn      = $('#vrSaveBtn');
+  var input    = $('#vrSaveInput');
+  var status   = $('#vrSaveStatus');
+  var csvInput = $('#vrSaveCsvFile');
+
+  if (btn && input) {
+    btn.addEventListener('click', async function() {
+      var text = (input.value || '').trim();
+      if (!text) { toast('Hãy dán link vào ô bên trên', 'info'); return; }
+      if (_isSaving) return;
+      _isSaving = true;
+      btn.disabled    = true;
+      btn.textContent = '⏳ Đang lưu...';
+      if (status) status.textContent = '';
+
+      try {
+        var urls = Importer.parseUrlsFromText(text);
+        if (urls.length === 0) { toast('Không tìm thấy link hợp lệ (TikTok / Facebook / Douyin)', 'error'); return; }
+
+        var results  = await Importer.importMany(urls);
+        var saved    = results.filter(function(r) { return r.ok; }).length;
+        var dupes    = results.filter(function(r) { return r.reason === 'duplicate'; }).length;
+        var errCount = results.length - saved - dupes;
+
+        var msg = '';
+        if (saved  > 0) msg += saved  + ' video đã lưu. ';
+        if (dupes  > 0) msg += dupes  + ' đã có trong Library. ';
+        if (errCount > 0) msg += errCount + ' link lỗi.';
+
+        if (status) status.textContent = msg.trim();
+
+        if (saved > 0) {
+          toast('Đã lưu ' + saved + ' video vào Library ↗', 'success');
+          input.value = '';
+          /* Refresh search results so new videos appear */
+          if (_searchState === 'done') _doSearch();
+        } else if (dupes > 0 && saved === 0) {
+          toast('Tất cả link đã có trong Library', 'info');
+        }
+      } catch (e) {
+        toast('Lỗi: ' + e.message, 'error');
+      } finally {
+        _isSaving       = false;
+        btn.disabled    = false;
+        btn.textContent = 'Lưu vào Library';
+      }
+    });
+  }
+
+  if (csvInput) {
+    csvInput.addEventListener('change', async function() {
+      var file = csvInput.files[0];
+      if (!file) return;
+      try {
+        var text    = await file.text();
+        var urls    = Importer.parseUrlsFromCsv(text);
+        if (urls.length === 0) { toast('Không tìm thấy link trong CSV', 'error'); return; }
+        var results = await Importer.importMany(urls);
+        var saved   = results.filter(function(r) { return r.ok; }).length;
+        toast('Đã lưu ' + saved + '/' + urls.length + ' video từ CSV', 'success');
+        if (saved > 0 && _searchState === 'done') _doSearch();
+      } catch (e) {
+        toast('Lỗi CSV: ' + e.message, 'error');
+      } finally {
+        csvInput.value = '';
+      }
+    });
+  }
+}
+
+/* ---- Helper: Library entry → used only for attachCardHandlers compat ---- */
+function _libEntryToCard(entry) {
+  return {
+    id:         entry.id,
+    platform:   entry.platform || 'tiktok',
+    region:     entry.region   || '',
+    title:      entry.title    || '',
+    thumbnail:  entry.thumbnail || '',
+    creator:    entry.creator  || '',
+    postedDate: entry.postedAt ? entry.postedAt.slice(0, 10) : '',
+    views:      entry.views    || 0,
+    likes:      entry.likes    || 0,
+    comments:   entry.comments || 0,
+    shares:     entry.shares   || 0,
+    viralScore: entry.viralScore != null ? entry.viralScore : 0,
+    tags:       entry.topics   || [],
+    url:        entry.url      || '#',
+    _reference: false
+  };
 }
