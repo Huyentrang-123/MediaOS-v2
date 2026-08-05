@@ -46,8 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* Register modules */
   registerPage('research', renderResearch);
-  registerPage('library',  renderLibrary);
-  registerPage('sources',  renderSources);
 
   /* Init router */
   router.init();

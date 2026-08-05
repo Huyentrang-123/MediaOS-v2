@@ -5,19 +5,17 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 module.exports = {
   port: parseInt(process.env.PORT || '3001', 10),
 
+  /* TikHub — optional. When apiKey is empty, TikTok/Douyin providers are inactive. */
   tikhub: {
     apiKey:  process.env.TIKHUB_API_KEY || '',
     baseUrl: 'https://api.tikhub.io'
   },
 
-  /* Facebook oEmbed token — optional; set FACEBOOK_APP_TOKEN in .env */
-  facebookAppToken: process.env.FACEBOOK_APP_TOKEN || '',
+  /* YouTube Data API v3 — optional. Free tier: 10,000 quota units/day. */
+  youtube: {
+    apiKey: process.env.YOUTUBE_API_KEY || ''
+  },
 
-  /*
-   * Viral score weights (Phase 1 — no historical growth data).
-   * shareRate + commentRate dominate so old popular videos aren't penalized.
-   * viewsPerHour = totalViews/totalHours (since posting), not recent growth.
-   */
   scoreWeights: {
     shareRate:    0.35,
     commentRate:  0.30,
@@ -25,13 +23,6 @@ module.exports = {
     viewsPerHour: 0.10
   },
 
-  minViralScore: 30,
-  maxResults:    30,
-
-  /*
-   * Paid search gate — must be explicitly enabled via env var.
-   * When false (default), /api/research returns 403 and no connector is called.
-   * Set ENABLE_PAID_SEARCH=true only when TikHub credit is available.
-   */
-  enablePaidSearch: process.env.ENABLE_PAID_SEARCH === 'true'
+  maxResults:   50,
+  cacheMinutes: 30
 };
