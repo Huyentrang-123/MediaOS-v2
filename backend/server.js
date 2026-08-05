@@ -5,6 +5,7 @@ const express = require('express');
 const config  = require('./config');
 
 const researchRouter = require('./routes/research');
+const oembedRouter   = require('./routes/oembed');
 
 const app    = express();
 const PUBLIC = path.join(__dirname, '..');
@@ -25,6 +26,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/research', researchRouter);
+app.use('/api/oembed',   oembedRouter);
 
 /* Generic error handler */
 app.use((err, _req, res, _next) => {

@@ -14,9 +14,10 @@ const MARKET_CONFIG = {
   cn:     { connector: douyin, region: null },
 };
 
-/* 30-minute in-memory response cache keyed by market:provider:query:offset */
+/* 24-hour in-memory response cache keyed by market:provider:query:offset
+ * Long TTL protects TikHub credit — same query/offset costs nothing to re-serve. */
 const _cache    = new Map();
-const CACHE_TTL = 30 * 60 * 1000;
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 10;
 
 function getCached(key) {

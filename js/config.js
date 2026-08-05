@@ -23,6 +23,8 @@ const CONFIG = {
 
   pageNames: {
     research:   'Viral Research',
+    library:    'Research Library',
+    sources:    'Nguồn Nghiên Cứu',
     campaigns:  'Campaigns',
     ideas:      'Ideas Board',
     aiwriter:   'AI Content Writer',

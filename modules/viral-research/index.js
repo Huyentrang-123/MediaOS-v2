@@ -7,6 +7,9 @@
 const BACKEND_URL = '';
 const SESSION_MAX = 50;
 
+/* ---- Mode: 'free' (import URLs) | 'tikhub' (API search) ---- */
+let _mode = 'free';
+
 /* ---- Session state ---- */
 let _apiResults        = [];
 let _searchState       = 'idle'; // 'idle' | 'loading' | 'done' | 'error'
@@ -65,26 +68,192 @@ function renderResearch(container) {
 
   container.innerHTML = `
     <div class="page-header">
-      <div class="page-title">🔍 AI Viral Research Engine</div>
-      <div class="page-subtitle">Nhập từ khóa — AI tự động phân tích, đánh giá và chọn lọc những video đáng nghiên cứu nhất trên TikTok và Facebook</div>
+      <div class="page-title">🔍 Viral Research</div>
+      <div class="page-subtitle">Nhập link video để lưu vào Library, hoặc dùng TikHub Search để tìm video tự động (tốn credit).</div>
     </div>
 
-    ${buildStatsBar()}
-    ${buildFilterBar(fs)}
+    <div class="vr-mode-tabs">
+      <button class="vr-mode-tab ${_mode === 'free' ? 'active' : ''}" id="vrModeTabFree">📥 Nhập link</button>
+      <button class="vr-mode-tab ${_mode === 'tikhub' ? 'active' : ''}" id="vrModeTabTikhub">🔍 TikHub Search</button>
+    </div>
 
-    <div class="section-header">
-      <div class="section-title">
-        🏆 Top video đáng nghiên cứu nhất
-        <span class="count-badge" id="vrCount">–</span>
+    <div id="vrFreePanel" style="${_mode !== 'free' ? 'display:none' : ''}">
+      ${buildFreePanel()}
+    </div>
+
+    <div id="vrTikHubPanel" style="${_mode !== 'tikhub' ? 'display:none' : ''}">
+      ${buildStatsBar()}
+      ${buildFilterBar(fs)}
+
+      <div class="section-header">
+        <div class="section-title">
+          🏆 Kết quả TikHub Search
+          <span class="count-badge" id="vrCount">–</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-3)" id="vrAiLabel"></div>
       </div>
-      <div style="font-size:12px;color:var(--text-3)" id="vrAiLabel"></div>
-    </div>
 
-    <div class="vr-grid" id="vrGrid"></div>
+      <div class="vr-grid" id="vrGrid"></div>
+    </div>
   `;
 
-  renderGrid();
-  bindFilterEvents();
+  _bindModeTabs();
+  if (_mode === 'tikhub') {
+    renderGrid();
+    bindFilterEvents();
+  } else {
+    _bindFreePanelEvents();
+  }
+}
+
+/* ---- Mode Tabs ---- */
+function _bindModeTabs() {
+  const freeTab    = $('#vrModeTabFree');
+  const tikhubTab  = $('#vrModeTabTikhub');
+  if (!freeTab || !tikhubTab) return;
+
+  freeTab.addEventListener('click', function() {
+    if (_mode === 'free') return;
+    _mode = 'free';
+    const container = $('#pageContainer');
+    if (container) renderResearch(container);
+  });
+
+  tikhubTab.addEventListener('click', function() {
+    if (_mode === 'tikhub') return;
+    /* Show confirmation before switching to TikHub mode */
+    _showTikHubConfirmDialog(function() {
+      _mode = 'tikhub';
+      const container = $('#pageContainer');
+      if (container) renderResearch(container);
+    });
+  });
+}
+
+/* ---- TikHub Confirmation Dialog ---- */
+function _showTikHubConfirmDialog(onConfirm) {
+  const fs          = state.viralResearch;
+  const market      = fs.region || 'global';
+  const provider    = market === 'cn' ? 'Douyin' : 'TikTok';
+  const keyword     = (fs.keyword || '').trim() || '(chưa nhập)';
+  const regionLabel = {
+    global: 'Toàn cầu', vn: 'Việt Nam', kr: 'Hàn Quốc', cn: 'Trung Quốc', tw: 'Đài Loan'
+  }[market] || market;
+
+  openModal(
+    '⚠️ Xác nhận dùng TikHub Search',
+    '<div class="vr-tikhub-confirm">' +
+      '<p>Mỗi lần tìm kiếm TikHub sẽ tiêu tốn <strong>1 request</strong> (khoảng 1–5 credit). ' +
+      'Kết quả sẽ được cache <strong>24 giờ</strong> để tiết kiệm credit.</p>' +
+      '<table class="vr-tikhub-confirm-table">' +
+        '<tr><td>Từ khóa</td><td><strong>' + esc(keyword) + '</strong></td></tr>' +
+        '<tr><td>Nền tảng</td><td>' + provider + '</td></tr>' +
+        '<tr><td>Thị trường</td><td>' + regionLabel + '</td></tr>' +
+        '<tr><td>Số request</td><td>1 (trang đầu tiên)</td></tr>' +
+      '</table>' +
+      '<div class="vr-tikhub-warning">' +
+        '💡 <strong>Gợi ý:</strong> Dùng chế độ <em>Nhập link</em> (miễn phí) để thu thập link từ TikTok/Facebook rồi lưu vào Library ' +
+        '— không tốn credit và không giới hạn số lượng.' +
+      '</div>' +
+    '</div>',
+    '<button class="btn btn-ghost" id="tikHubCancelBtn">Hủy — Dùng miễn phí</button>' +
+    '<button class="btn btn-primary" id="tikHubConfirmBtn">Xác nhận tìm kiếm</button>'
+  );
+
+  setTimeout(function() {
+    var cancelBtn  = $('#tikHubCancelBtn');
+    var confirmBtn = $('#tikHubConfirmBtn');
+    if (cancelBtn)  cancelBtn.addEventListener('click', closeModal);
+    if (confirmBtn) confirmBtn.addEventListener('click', function() {
+      closeModal();
+      if (onConfirm) onConfirm();
+    });
+  }, 0);
+}
+
+/* ---- Free Panel ---- */
+function buildFreePanel() {
+  return '<div class="vr-quick-import">' +
+    '<div class="vr-quick-import-title">📋 Dán link video để lưu vào Research Library</div>' +
+    '<div class="vr-quick-import-row">' +
+      '<input class="vr-quick-input" id="vrQuickUrl" type="url" ' +
+        'placeholder="https://www.tiktok.com/@user/video/... hoặc fb.watch/...">' +
+      '<select class="lib-region-select" id="vrQuickRegion">' +
+        '<option value="global">🌏 Toàn cầu</option>' +
+        '<option value="vn">🇻🇳 Việt Nam</option>' +
+        '<option value="kr">🇰🇷 Hàn Quốc</option>' +
+        '<option value="cn">🇨🇳 Trung Quốc</option>' +
+        '<option value="tw">🇹🇼 Đài Loan</option>' +
+      '</select>' +
+      '<button class="btn btn-primary" id="vrQuickImportBtn">📥 Lưu vào Library</button>' +
+      '<button class="btn btn-ghost" id="vrQuickPasteBtn" title="Dán từ clipboard">📋 Dán</button>' +
+    '</div>' +
+    '<div id="vrQuickStatus" style="font-size:12px;color:var(--text-3);margin-top:8px"></div>' +
+  '</div>' +
+
+  '<div style="font-size:13px;color:var(--text-2);padding:8px 0 12px">' +
+    'Sau khi lưu, vào <a href="#library" class="link" style="color:var(--color-primary)">Research Library</a> ' +
+    'để xem, gắn tag và phân tích toàn bộ video đã thu thập.' +
+  '</div>' +
+
+  '<div style="font-size:12px;color:var(--text-3);padding-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">' +
+    'Hoặc đến các nguồn nghiên cứu miễn phí:' +
+  '</div>' +
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' +
+    '<a class="btn btn-secondary btn-sm" href="https://www.tiktok.com/search" target="_blank" rel="noopener noreferrer">♪ TikTok Search</a>' +
+    '<a class="btn btn-secondary btn-sm" href="https://ads.tiktok.com/business/creativecenter/inspiration/popular/pc/en" target="_blank" rel="noopener noreferrer">📈 Creative Center</a>' +
+    '<a class="btn btn-secondary btn-sm" href="https://www.facebook.com/search/reels/?q=" target="_blank" rel="noopener noreferrer">f Facebook Reels</a>' +
+    '<a class="btn btn-outline btn-sm" href="#sources">🔗 Xem tất cả nguồn</a>' +
+  '</div>';
+}
+
+function _bindFreePanelEvents() {
+  var importBtn = $('#vrQuickImportBtn');
+  var pasteBtn  = $('#vrQuickPasteBtn');
+  var urlInput  = $('#vrQuickUrl');
+  var statusEl  = $('#vrQuickStatus');
+
+  if (pasteBtn) {
+    pasteBtn.addEventListener('click', async function() {
+      try {
+        var text = await navigator.clipboard.readText();
+        if (urlInput) urlInput.value = text.trim();
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Không thể đọc clipboard — hãy dán thủ công.';
+      }
+    });
+  }
+
+  if (importBtn && urlInput && statusEl) {
+    importBtn.addEventListener('click', async function() {
+      var url    = (urlInput.value || '').trim();
+      var region = ($('#vrQuickRegion') || {}).value || 'global';
+      if (!url) { statusEl.textContent = 'Vui lòng nhập URL.'; return; }
+
+      importBtn.disabled    = true;
+      importBtn.textContent = '⏳ Đang lưu...';
+      statusEl.textContent  = '';
+
+      try {
+        var result = await Importer.importUrl(url, { region: region, addedBy: '' });
+        if (result.ok) {
+          statusEl.textContent = '✅ Đã lưu vào Research Library.';
+          urlInput.value       = '';
+        } else if (result.reason === 'duplicate') {
+          statusEl.textContent = 'Video này đã có trong Library.';
+        } else if (result.reason === 'invalid_url') {
+          statusEl.textContent = 'URL không hợp lệ hoặc không được hỗ trợ.';
+        } else {
+          statusEl.textContent = 'Lỗi: ' + (result.reason || 'unknown');
+        }
+      } catch (e) {
+        statusEl.textContent = 'Lỗi: ' + e.message;
+      } finally {
+        importBtn.disabled    = false;
+        importBtn.textContent = '📥 Lưu vào Library';
+      }
+    });
+  }
 }
 
 /* ---- Stats Bar ---- */

@@ -10,6 +10,9 @@ module.exports = {
     baseUrl: 'https://api.tikhub.io'
   },
 
+  /* Facebook oEmbed token — optional; set FACEBOOK_APP_TOKEN in .env */
+  facebookAppToken: process.env.FACEBOOK_APP_TOKEN || '',
+
   /*
    * Viral score weights (Phase 1 — no historical growth data).
    * shareRate + commentRate dominate so old popular videos aren't penalized.

@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/modules/viral-research.css">
+  <link rel="stylesheet" href="css/modules/library.css">
 </head>
 <body>
 
@@ -35,6 +36,14 @@
           <a class="nav-item" data-page="research" href="#research">
             <span class="nav-icon">🔍</span>
             <span class="nav-label">Viral Research</span>
+          </a>
+          <a class="nav-item" data-page="library" href="#library">
+            <span class="nav-icon">📚</span>
+            <span class="nav-label">Research Library</span>
+          </a>
+          <a class="nav-item" data-page="sources" href="#sources">
+            <span class="nav-icon">🔗</span>
+            <span class="nav-label">Nguồn nghiên cứu</span>
           </a>
         </div>
 
@@ -132,6 +141,20 @@
   <script src="modules/viral-research/filters.js"></script>
   <script src="modules/viral-research/cards.js"></script>
   <script src="modules/viral-research/index.js"></script>
+
+  <!-- IndexedDB adapter (no deps) -->
+  <script src="js/db.js"></script>
+
+  <!-- Research Library module (depends on db.js + utils) -->
+  <script src="modules/library/analysis.js"></script>
+  <script src="modules/library/storage.js"></script>
+  <script src="modules/library/importer.js"></script>
+  <script src="modules/library/form.js"></script>
+  <script src="modules/library/cards.js"></script>
+  <script src="modules/library/index.js"></script>
+
+  <!-- Research Sources module (no deps) -->
+  <script src="modules/research-sources/index.js"></script>
 
   <!-- Router + App init (must be last) -->
   <script src="js/router.js"></script>
