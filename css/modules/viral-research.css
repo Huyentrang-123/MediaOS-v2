@@ -491,12 +491,40 @@
   border-radius: 10px;
 }
 
-.vr-action-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-1);
-  margin-bottom: 10px;
+/* Collect-more single button */
+.vr-collect-btn { white-space: nowrap; }
+
+/* Dropdown wrapper + menu */
+.vr-collect-wrap {
+  position: relative;
+  display: inline-block;
 }
+
+.vr-collect-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.14);
+  min-width: 220px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.vr-collect-item {
+  display: block;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-1);
+  text-decoration: none;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--border);
+}
+
+.vr-collect-item:last-child { border-bottom: none; }
+.vr-collect-item:hover { background: var(--surface-2); }
 
 .vr-action-row {
   display: flex;

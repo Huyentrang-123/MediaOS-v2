@@ -329,19 +329,33 @@ function _buildPagination(total) {
 
 /* ============================================================
    ACTION BAR — collect more + query variants
+   Single button at bottom of results.
+   - TikTok only  → open TikTok Search directly
+   - Facebook only → open Facebook Videos directly
+   - All           → dropdown with two choices
    ============================================================ */
 function _buildActionBar() {
   var query    = _lastQuery;
   var platform = _lastPlatform;
-
-  var isTikTok   = platform === 'all' || platform === 'tiktok';
-  var isFacebook = platform === 'all' || platform === 'facebook';
-  var tiktokUrl  = 'https://www.tiktok.com/search/video?q=' + encodeURIComponent(query);
+  var tiktokUrl   = 'https://www.tiktok.com/search/video?q=' + encodeURIComponent(query);
   var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
 
-  var openLinks = '';
-  if (isTikTok)   openLinks += '<a class="btn btn-outline btn-sm" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">TikTok ↗</a>';
-  if (isFacebook) openLinks += '<a class="btn btn-outline btn-sm" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Facebook ↗</a>';
+  var collectBtn;
+  if (platform === 'tiktok') {
+    collectBtn = '<a class="btn btn-primary vr-collect-btn" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm kết quả ↗</a>';
+  } else if (platform === 'facebook') {
+    collectBtn = '<a class="btn btn-primary vr-collect-btn" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm kết quả ↗</a>';
+  } else {
+    /* All platforms — dropdown */
+    collectBtn =
+      '<div class="vr-collect-wrap">' +
+        '<button class="btn btn-primary vr-collect-btn" id="vrCollectMoreBtn">Thu thập thêm kết quả ▾</button>' +
+        '<div class="vr-collect-menu" id="vrCollectMenu" hidden>' +
+          '<a class="vr-collect-item" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm từ TikTok ↗</a>' +
+          '<a class="vr-collect-item" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm từ Facebook ↗</a>' +
+        '</div>' +
+      '</div>';
+  }
 
   var variants = typeof vrAllVariants === 'function' ? vrAllVariants(_lastKeyword, _lastMarket) : [];
   var chips = variants.slice(1, 7).map(function(q) {
@@ -349,13 +363,12 @@ function _buildActionBar() {
   }).join('');
 
   return '<div class="vr-action-bar">' +
-    '<div class="vr-action-title">Thu thập thêm kết quả</div>' +
     '<div class="vr-action-row">' +
-      openLinks +
+      collectBtn +
       '<span class="vr-action-hint">Cuộn thêm trên nền tảng rồi bấm extension lần nữa.</span>' +
     '</div>' +
-    (chips ? '<div class="vr-suggestions"><span class="vr-suggestions-label">Thử thêm:</span>' + chips + '</div>' : '') +
-    '<div class="vr-action-row" style="margin-top:8px">' +
+    (chips ? '<div class="vr-suggestions" style="margin-top:10px"><span class="vr-suggestions-label">Thử thêm:</span>' + chips + '</div>' : '') +
+    '<div class="vr-action-row" style="margin-top:10px">' +
       '<button class="btn btn-outline btn-sm" id="vrClearBtn">Xóa tất cả kết quả</button>' +
     '</div>' +
   '</div>';
@@ -622,6 +635,23 @@ function _bindResultEvents() {
     _page   = 1;
     _rerenderResults();
   });
+
+  /* Collect more dropdown (platform = 'all') */
+  var collectMoreBtn = $('#vrCollectMoreBtn');
+  var collectMenu    = $('#vrCollectMenu');
+  if (collectMoreBtn && collectMenu) {
+    collectMoreBtn.addEventListener('click', function(e) {
+      var opening = collectMenu.hidden; /* true = about to open */
+      collectMenu.hidden = !opening;
+      e.stopPropagation();
+      if (opening) {
+        /* Close menu on next click anywhere outside this button */
+        document.addEventListener('click', function() {
+          if (collectMenu) collectMenu.hidden = true;
+        }, { once: true });
+      }
+    });
+  }
 }
 
 /* ============================================================
