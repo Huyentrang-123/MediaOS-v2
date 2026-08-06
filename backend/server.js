@@ -4,8 +4,6 @@ const path    = require('path');
 const express = require('express');
 const config  = require('./config');
 
-const variantsRouter = require('./routes/variants');
-
 const app    = express();
 const PUBLIC = path.join(__dirname, '..');
 
@@ -15,8 +13,6 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', mode: 'browser-assisted', timestamp: new Date().toISOString() });
 });
-
-app.use('/api/variants', variantsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
