@@ -7,13 +7,23 @@
 'use strict';
 
 /* ── Module state ──────────────────────────────────────── */
-var _videos       = [];    /* scored video array */
-var _sortBy       = 'score';
-var _hasSearched  = false; /* user has clicked Tìm kiếm at least once */
-var _lastKeyword  = '';
-var _lastQuery    = '';
-var _lastMarket   = 'global';
-var _lastPlatform = 'all';
+var _videos             = [];   /* scored + ranked + badged video array */
+var _hasSearched        = false;
+var _lastKeyword        = '';
+var _lastQuery          = '';
+var _lastMarket         = 'global';
+var _lastPlatform       = 'all';
+var _totalCollectedCount = 0;   /* cumulative unique adds (before 100-cap) */
+
+/* Filter / sort state */
+var _sortBy          = 'relevant'; /* 'relevant'|'views'|'comments'|'likes'|'score'|'newest' */
+var _filterMinViews  = 0;
+var _filterMinCmt    = 0;
+var _filterOnlyStats = false;
+var _filterPriCmt    = false;
+var _filterHideDup   = false;
+var _page            = 1;
+var _pageSize        = 30;
 
 /* ============================================================
    RENDER — router entry point
@@ -30,7 +40,6 @@ function renderResearch(container) {
   _bindSearchEvents();
   if (_hasSearched) _bindResultEvents();
 
-  /* Listen for extension data (auto-triggered by bridge or hash) */
   window.addEventListener('mediaos:import', _onExtensionImport, { once: false });
 }
 
@@ -38,13 +47,7 @@ function renderResearch(container) {
    SEARCH SECTION
    ============================================================ */
 function _buildSearchSection(fs) {
-  var platformOpts = [
-    { id: 'all',      label: 'Tất cả' },
-    { id: 'tiktok',   label: 'TikTok' },
-    { id: 'facebook', label: 'Facebook' }
-  ];
-
-  var platformChips = platformOpts.map(function(p) {
+  var platformChips = CONFIG.platforms.map(function(p) {
     return '<button class="vr-chip' + (fs.platform === p.id ? ' active' : '') +
       '" data-platform="' + p.id + '">' + p.label + '</button>';
   }).join('');
@@ -79,8 +82,8 @@ function _buildSearchSection(fs) {
    RESULTS AREA
    ============================================================ */
 function _buildResultsArea() {
-  if (!_hasSearched)           return _buildIdleState();
-  if (_videos.length === 0)    return _buildReadyState();
+  if (!_hasSearched)        return _buildIdleState();
+  if (_videos.length === 0) return _buildReadyState();
   return _buildResultsContent();
 }
 
@@ -96,9 +99,8 @@ function _buildIdleState() {
 
 function _buildReadyState() {
   var kw      = _lastKeyword;
-  var market  = _lastMarket;
-  var platform = _lastPlatform;
   var query   = _lastQuery;
+  var platform = _lastPlatform;
 
   var isTikTok  = platform === 'all' || platform === 'tiktok';
   var isFacebook = platform === 'all' || platform === 'facebook';
@@ -107,7 +109,7 @@ function _buildReadyState() {
   var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
 
   var btns = '';
-  if (isTikTok)   btns += '<a class="btn btn-primary vr-open-btn" href="' + tiktokUrl  + '" target="_blank" rel="noopener noreferrer">Mở TikTok Search ↗</a>';
+  if (isTikTok)   btns += '<a class="btn btn-primary vr-open-btn" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Mở TikTok Search ↗</a>';
   if (isFacebook) btns += '<a class="btn btn-outline vr-open-btn" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Mở Facebook Videos ↗</a>';
 
   var queryDisplay = query !== kw
@@ -124,52 +126,212 @@ function _buildReadyState() {
         '<li>Bấm <strong>"Thu thập kết quả đang hiển thị"</strong>.</li>' +
         '<li>Extension tự động gửi dữ liệu về đây.</li>' +
       '</ol>' +
+      '<a class="vr-guide-link" href="#" onclick="return false">Xem hướng dẫn chi tiết</a>' +
       '<div class="vr-waiting-indicator">⏳ Đang chờ dữ liệu từ Extension...</div>' +
-      '<button class="btn btn-outline btn-sm vr-manual-import" id="vrManualImport" style="margin-top:10px">' +
+      '<button class="btn btn-outline btn-sm" id="vrManualImport" style="margin-top:10px">' +
         'Nhận kết quả từ Extension thủ công' +
       '</button>' +
     '</div>';
 }
 
+/* ============================================================
+   RESULTS CONTENT (has videos)
+   ============================================================ */
 function _buildResultsContent() {
-  var sorted = _sortResults(_videos);
-  var html   = [];
+  var filtered = _applyFilters(_videos);
+  var sorted   = _sortResults(filtered);
+  var total    = filtered.length;
+  var startIdx = (_page - 1) * _pageSize;
+  var paged    = sorted.slice(startIdx, startIdx + _pageSize);
 
-  /* Summary + sort bar */
-  html.push(
-    '<div class="vr-summary-bar">' +
-      '<span class="vr-summary-text">Tìm thấy <strong>' + _videos.length + '</strong> video' +
-        (_videos.length >= 100 ? ' (tối đa 100)' : '') +
-      '</span>' +
-      _buildSortBar() +
-    '</div>'
-  );
+  var html = [];
 
-  /* Grid */
-  html.push('<div class="vr-grid" id="vrGrid">' +
-    sorted.map(function(v) { return renderVideoCard(v); }).join('') +
-  '</div>');
+  html.push(_buildStatsRow(filtered));
+  html.push(_buildFilterBar());
 
-  /* Action bar: collect more + query variants */
+  if (paged.length === 0) {
+    html.push(
+      '<div class="vr-filter-empty">' +
+        'Không có video nào phù hợp bộ lọc. ' +
+        '<button class="btn btn-sm btn-outline vr-reset-filter-btn" id="vrResetFilter2">Đặt lại bộ lọc</button>' +
+      '</div>'
+    );
+  } else {
+    html.push('<div class="vr-grid" id="vrGrid">' +
+      paged.map(function(v) { return renderVideoCard(v); }).join('') +
+    '</div>');
+  }
+
+  html.push(_buildPagination(total));
   html.push(_buildActionBar());
 
   return html.join('');
 }
 
-function _buildSortBar() {
-  var sorts = [{ id: 'score', label: 'Viral Score' }, { id: 'views', label: 'Views' }, { id: 'newest', label: 'Mới nhất' }];
-  return '<div class="vr-sort-group">' +
-    '<span class="vr-sort-label">Sắp xếp:</span>' +
-    sorts.map(function(s) {
-      return '<button class="vr-sort-btn' + (_sortBy === s.id ? ' active' : '') +
-        '" data-sort="' + s.id + '">' + s.label + '</button>';
-    }).join('') +
+/* ============================================================
+   STATS ROW
+   ============================================================ */
+function _buildStatsRow(filtered) {
+  var all = _videos;
+  var maxV = null, maxC = null, over100k = 0, over500c = 0;
+
+  all.forEach(function(v) {
+    if (v.views != null) {
+      if (maxV == null || v.views > maxV) maxV = v.views;
+      if (v.views > 100000) over100k++;
+    }
+    if (v.comments != null) {
+      if (maxC == null || v.comments > maxC) maxC = v.comments;
+      if (v.comments > 500) over500c++;
+    }
+  });
+
+  var collectedDisplay = _totalCollectedCount > 0 ? _totalCollectedCount : all.length;
+
+  return '<div class="vr-stats-row">' +
+    _statBox(collectedDisplay, 'Extension đã thu thập') +
+    _statBox(filtered.length, 'Sau lọc') +
+    _statBox(maxV != null ? formatNumber(maxV) : '—', 'View cao nhất') +
+    _statBox(maxC != null ? formatNumber(maxC) : '—', 'Comment cao nhất') +
+    _statBox(over100k, 'Trên 100K views') +
+    _statBox(over500c, 'Trên 500 comments') +
   '</div>';
 }
 
+function _statBox(val, label) {
+  return '<div class="vr-stat-box">' +
+    '<div class="vr-stat-box-val">' + val + '</div>' +
+    '<div class="vr-stat-box-label">' + label + '</div>' +
+  '</div>';
+}
+
+/* ============================================================
+   FILTER BAR
+   ============================================================ */
+function _buildFilterBar() {
+  function opt(val, label, selected) {
+    return '<option value="' + val + '"' + (val == selected ? ' selected' : '') + '>' + label + '</option>';
+  }
+
+  var sortSel =
+    '<select id="vrSortSelect" class="vr-filter-select">' +
+      opt('relevant',  'Phù hợp nhất',       _sortBy) +
+      opt('views',     'View cao nhất',        _sortBy) +
+      opt('comments',  'Comment nhiều nhất',   _sortBy) +
+      opt('likes',     'Like nhiều nhất',      _sortBy) +
+      opt('score',     'Viral Score cao nhất', _sortBy) +
+      opt('newest',    'Mới nhất',             _sortBy) +
+    '</select>';
+
+  var viewSel =
+    '<select id="vrViewSelect" class="vr-filter-select">' +
+      opt(0,       'Tất cả views', _filterMinViews) +
+      opt(10000,   'Trên 10K',     _filterMinViews) +
+      opt(50000,   'Trên 50K',     _filterMinViews) +
+      opt(100000,  'Trên 100K',    _filterMinViews) +
+      opt(500000,  'Trên 500K',    _filterMinViews) +
+      opt(1000000, 'Trên 1M',      _filterMinViews) +
+    '</select>';
+
+  var cmtSel =
+    '<select id="vrCmtSelect" class="vr-filter-select">' +
+      opt(0,    'Tất cả comments', _filterMinCmt) +
+      opt(50,   'Trên 50',         _filterMinCmt) +
+      opt(100,  'Trên 100',        _filterMinCmt) +
+      opt(500,  'Trên 500',        _filterMinCmt) +
+      opt(1000, 'Trên 1K',         _filterMinCmt) +
+    '</select>';
+
+  return '<div class="vr-filter-bar">' +
+    '<div class="vr-filter-controls">' +
+      sortSel + viewSel + cmtSel +
+      '<label class="vr-filter-check"><input type="checkbox" id="vrOnlyStats"' + (_filterOnlyStats ? ' checked' : '') + '><span>Chỉ có đủ chỉ số</span></label>' +
+      '<label class="vr-filter-check"><input type="checkbox" id="vrPriCmt"'   + (_filterPriCmt   ? ' checked' : '') + '><span>Ưu tiên comment</span></label>' +
+      '<label class="vr-filter-check"><input type="checkbox" id="vrHideDup"'  + (_filterHideDup  ? ' checked' : '') + '><span>Ẩn trùng lặp</span></label>' +
+      '<button class="btn btn-outline btn-sm vr-reset-filter-btn" id="vrResetFilter">Đặt lại bộ lọc</button>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ============================================================
+   FILTER + SORT
+   ============================================================ */
+function _applyFilters(videos) {
+  var seen = {};
+  return videos.filter(function(v) {
+    if (_filterMinViews > 0 && (v.views    == null || v.views    < _filterMinViews)) return false;
+    if (_filterMinCmt   > 0 && (v.comments == null || v.comments < _filterMinCmt))   return false;
+    if (_filterOnlyStats && !v.statsAvailable) return false;
+    if (_filterHideDup) {
+      var key = (v.caption || '').trim().toLowerCase();
+      if (key && seen[key]) return false;
+      if (key) seen[key] = true;
+    }
+    return true;
+  });
+}
+
+function _sortResults(arr) {
+  var copy = arr.slice();
+  switch (_sortBy) {
+    case 'views':
+      return copy.sort(function(a, b) { return (b.views    || 0) - (a.views    || 0); });
+    case 'comments':
+      return copy.sort(function(a, b) { return (b.comments || 0) - (a.comments || 0); });
+    case 'likes':
+      return copy.sort(function(a, b) { return (b.likes    || 0) - (a.likes    || 0); });
+    case 'score':
+      return copy.sort(function(a, b) { return (b.viralScore || 0) - (a.viralScore || 0); });
+    case 'newest':
+      return copy.sort(function(a, b) {
+        return new Date(b.postedAt || 0) - new Date(a.postedAt || 0);
+      });
+    default: /* 'relevant' — sort by researchRank, null to end */
+      return copy.sort(function(a, b) {
+        var ar = a.researchRank != null ? a.researchRank : -1;
+        var br = b.researchRank != null ? b.researchRank : -1;
+        return br - ar;
+      });
+  }
+}
+
+/* ============================================================
+   PAGINATION
+   ============================================================ */
+function _buildPagination(total) {
+  if (total <= _pageSize) return '';
+  var totalPages = Math.ceil(total / _pageSize);
+  var html = '<div class="vr-pagination">';
+
+  html += '<button class="vr-page-btn" data-page="' + Math.max(1, _page - 1) + '"' + (_page <= 1 ? ' disabled' : '') + '>Trước</button>';
+
+  var start = Math.max(1, _page - 2);
+  var end   = Math.min(totalPages, _page + 2);
+
+  if (start > 1) {
+    html += '<button class="vr-page-btn" data-page="1">1</button>';
+    if (start > 2) html += '<span class="vr-page-ellipsis">…</span>';
+  }
+
+  for (var p = start; p <= end; p++) {
+    html += '<button class="vr-page-btn' + (p === _page ? ' active' : '') + '" data-page="' + p + '">' + p + '</button>';
+  }
+
+  if (end < totalPages) {
+    if (end < totalPages - 1) html += '<span class="vr-page-ellipsis">…</span>';
+    html += '<button class="vr-page-btn" data-page="' + totalPages + '">' + totalPages + '</button>';
+  }
+
+  html += '<button class="vr-page-btn" data-page="' + Math.min(totalPages, _page + 1) + '"' + (_page >= totalPages ? ' disabled' : '') + '>Sau</button>';
+  html += '</div>';
+  return html;
+}
+
+/* ============================================================
+   ACTION BAR — collect more + query variants
+   ============================================================ */
 function _buildActionBar() {
-  var query   = _lastQuery;
-  var market  = _lastMarket;
+  var query    = _lastQuery;
   var platform = _lastPlatform;
 
   var isTikTok   = platform === 'all' || platform === 'tiktok';
@@ -178,20 +340,19 @@ function _buildActionBar() {
   var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
 
   var openLinks = '';
-  if (isTikTok)   openLinks += '<a class="btn btn-outline btn-sm" href="' + tiktokUrl  + '" target="_blank" rel="noopener noreferrer">TikTok ↗</a> ';
+  if (isTikTok)   openLinks += '<a class="btn btn-outline btn-sm" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">TikTok ↗</a>';
   if (isFacebook) openLinks += '<a class="btn btn-outline btn-sm" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Facebook ↗</a>';
 
-  /* Query expansion chips */
   var variants = typeof vrAllVariants === 'function' ? vrAllVariants(_lastKeyword, _lastMarket) : [];
-  var chips    = variants.slice(1, 7).map(function(q) {
+  var chips = variants.slice(1, 7).map(function(q) {
     return '<button class="vr-suggestion-chip" data-query="' + esc(q) + '">' + esc(q) + '</button>';
   }).join('');
 
   return '<div class="vr-action-bar">' +
+    '<div class="vr-action-title">Thu thập thêm kết quả</div>' +
     '<div class="vr-action-row">' +
-      '<span class="vr-action-label">Thu thập thêm →</span>' +
       openLinks +
-      '<span class="vr-action-hint">Cuộn thêm rồi bấm extension lần nữa.</span>' +
+      '<span class="vr-action-hint">Cuộn thêm trên nền tảng rồi bấm extension lần nữa.</span>' +
     '</div>' +
     (chips ? '<div class="vr-suggestions"><span class="vr-suggestions-label">Thử thêm:</span>' + chips + '</div>' : '') +
     '<div class="vr-action-row" style="margin-top:8px">' +
@@ -201,15 +362,29 @@ function _buildActionBar() {
 }
 
 /* ============================================================
-   SORT
+   BADGE PERCENTILE COMPUTATION
+   Top 20% of views → _badgeViewTop = true
+   Top 20% of comments → _badgeCmtTop = true
    ============================================================ */
-function _sortResults(arr) {
-  var copy = arr.slice();
-  if (_sortBy === 'views')  return copy.sort(function(a, b) { return (b.views || 0) - (a.views || 0); });
-  if (_sortBy === 'newest') return copy.sort(function(a, b) {
-    return new Date(b.postedAt || 0) - new Date(a.postedAt || 0);
+function _computeBadges(videos) {
+  var viewVals = videos.filter(function(v) { return v.views    != null; }).map(function(v) { return v.views;    });
+  var cmtVals  = videos.filter(function(v) { return v.comments != null; }).map(function(v) { return v.comments; });
+
+  viewVals.sort(function(a, b) { return b - a; });
+  cmtVals.sort(function(a, b)  { return b - a; });
+
+  var viewTopN = Math.ceil(viewVals.length * 0.20);
+  var cmtTopN  = Math.ceil(cmtVals.length  * 0.20);
+
+  var viewThresh = viewTopN > 0 ? viewVals[viewTopN - 1] : null;
+  var cmtThresh  = cmtTopN  > 0 ? cmtVals[cmtTopN  - 1] : null;
+
+  return videos.map(function(v) {
+    return Object.assign({}, v, {
+      _badgeViewTop: viewThresh != null && v.views    != null && v.views    >= viewThresh,
+      _badgeCmtTop:  cmtThresh  != null && v.comments != null && v.comments >= cmtThresh
+    });
   });
-  return copy.sort(function(a, b) { return (b.viralScore || 0) - (a.viralScore || 0); });
 }
 
 /* ============================================================
@@ -222,29 +397,33 @@ function _onExtensionImport(e) {
 }
 
 function _mergeAndProcess(incoming) {
-  var existingIds = new Set(_videos.map(function(v) { return v.id; }));
+  var existingIds = {};
+  _videos.forEach(function(v) { existingIds[v.id] = true; });
 
-  /* Assign market and matchedQuery if missing */
   var enriched = incoming.map(function(v) {
     var hoursOld = v.postedAt ? Math.max(1, (Date.now() - new Date(v.postedAt).getTime()) / 3600000) : null;
     var vph      = (hoursOld && v.views) ? v.views / hoursOld : null;
     return Object.assign({}, v, {
-      market:         v.market       || _lastMarket,
-      matchedQuery:   v.matchedQuery || _lastQuery || _lastKeyword,
-      viewsPerHour:   v.viewsPerHour || vph
+      market:       v.market       || _lastMarket,
+      matchedQuery: v.matchedQuery || _lastQuery || _lastKeyword,
+      viewsPerHour: v.viewsPerHour || vph
     });
   });
 
-  var added   = enriched.filter(function(v) { return !existingIds.has(v.id); });
-  var merged  = _videos.concat(added).slice(0, 100);
+  var added  = enriched.filter(function(v) { return !existingIds[v.id]; });
+  var merged = _videos.concat(added).slice(0, 100);
 
-  /* Client-side viral scoring */
+  _totalCollectedCount += added.length;
+
   var scored  = scoreVideos(merged);
-  _videos     = scored.map(function(v) {
+  var ranked  = computeResearchRank(scored, _filterPriCmt);
+  var badged  = _computeBadges(ranked);
+  _videos = badged.map(function(v) {
     return Object.assign({}, v, { whyViral: getWhyViral(v) });
   });
 
   _hasSearched = true;
+  _page = 1; /* reset page on new batch */
   _rerenderResults();
 
   if (added.length > 0) {
@@ -255,7 +434,7 @@ function _mergeAndProcess(incoming) {
 }
 
 /* ============================================================
-   DO SEARCH — sets up query and opens platform links
+   DO SEARCH
    ============================================================ */
 function _doSearch() {
   var input = $('#vrKeyword');
@@ -267,22 +446,18 @@ function _doSearch() {
   var kw = (state.viralResearch.keyword || '').trim();
   if (!kw) { toast('Hãy nhập từ khóa', 'info'); return; }
 
-  var fs    = state.viralResearch;
+  var fs        = state.viralResearch;
   _lastKeyword  = kw;
   _lastMarket   = fs.region   || 'global';
   _lastPlatform = fs.platform || 'all';
 
-  /* Localized query via query-expansion module */
   _lastQuery = (typeof vrLocalizeQuery === 'function')
     ? vrLocalizeQuery(kw, _lastMarket)
     : kw;
 
   _hasSearched = true;
-
-  /* Keep existing results, just rebuild UI */
   _rerenderResults();
 
-  /* Auto-trigger bridge check in case extension already stored data */
   window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
 }
 
@@ -297,7 +472,7 @@ function _rerenderResults() {
 }
 
 /* ============================================================
-   EVENT BINDING
+   EVENT BINDING — search section
    ============================================================ */
 function _bindSearchEvents() {
   var btn = $('#vrSearchBtn');
@@ -332,14 +507,86 @@ function _bindSearchEvents() {
   });
 }
 
+/* ============================================================
+   EVENT BINDING — results section
+   ============================================================ */
 function _bindResultEvents() {
-  /* Sort buttons */
-  $$('[data-sort]').forEach(function(btn) {
+  /* Sort select */
+  var sortSel = $('#vrSortSelect');
+  if (sortSel) sortSel.addEventListener('change', function() {
+    _sortBy = sortSel.value;
+    _page   = 1;
+    _rerenderResults();
+  });
+
+  /* View threshold */
+  var viewSel = $('#vrViewSelect');
+  if (viewSel) viewSel.addEventListener('change', function() {
+    _filterMinViews = parseInt(viewSel.value, 10) || 0;
+    _page = 1;
+    _rerenderResults();
+  });
+
+  /* Comment threshold */
+  var cmtSel = $('#vrCmtSelect');
+  if (cmtSel) cmtSel.addEventListener('change', function() {
+    _filterMinCmt = parseInt(cmtSel.value, 10) || 0;
+    _page = 1;
+    _rerenderResults();
+  });
+
+  /* Only stats checkbox */
+  var chkStats = $('#vrOnlyStats');
+  if (chkStats) chkStats.addEventListener('change', function() {
+    _filterOnlyStats = chkStats.checked;
+    _page = 1;
+    _rerenderResults();
+  });
+
+  /* Prioritize comments checkbox — also recomputes researchRank */
+  var chkPriCmt = $('#vrPriCmt');
+  if (chkPriCmt) chkPriCmt.addEventListener('change', function() {
+    _filterPriCmt = chkPriCmt.checked;
+    _videos = computeResearchRank(_videos, _filterPriCmt);
+    _page   = 1;
+    _rerenderResults();
+  });
+
+  /* Hide duplicates checkbox */
+  var chkDup = $('#vrHideDup');
+  if (chkDup) chkDup.addEventListener('change', function() {
+    _filterHideDup = chkDup.checked;
+    _page = 1;
+    _rerenderResults();
+  });
+
+  /* Reset filter buttons */
+  function resetFilters() {
+    _sortBy          = 'relevant';
+    _filterMinViews  = 0;
+    _filterMinCmt    = 0;
+    _filterOnlyStats = false;
+    _filterPriCmt    = false;
+    _filterHideDup   = false;
+    _page            = 1;
+    _rerenderResults();
+  }
+  var resetBtn  = $('#vrResetFilter');
+  var resetBtn2 = $('#vrResetFilter2');
+  if (resetBtn)  resetBtn.addEventListener('click',  resetFilters);
+  if (resetBtn2) resetBtn2.addEventListener('click', resetFilters);
+
+  /* Pagination buttons */
+  $$('[data-page]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      _sortBy = btn.dataset.sort;
-      $$('[data-sort]').forEach(function(b) { b.classList.toggle('active', b.dataset.sort === _sortBy); });
-      var grid = $('#vrGrid');
-      if (grid) grid.innerHTML = _sortResults(_videos).map(function(v) { return renderVideoCard(v); }).join('');
+      if (btn.disabled) return;
+      var newPage = parseInt(btn.dataset.page, 10);
+      if (!isNaN(newPage) && newPage !== _page) {
+        _page = newPage;
+        _rerenderResults();
+        var el = $('#vrResults');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
   });
 
@@ -352,36 +599,33 @@ function _bindResultEvents() {
       if (input) input.value = q;
       state.viralResearch.keyword = q;
       saveState();
-      /* Open platform with new query */
       var isTikTok   = _lastPlatform === 'all' || _lastPlatform === 'tiktok';
       var isFacebook = _lastPlatform === 'all' || _lastPlatform === 'facebook';
-      if (isTikTok)   window.open('https://www.tiktok.com/search/video?q=' + encodeURIComponent(q), '_blank', 'noopener');
+      if (isTikTok)        window.open('https://www.tiktok.com/search/video?q=' + encodeURIComponent(q), '_blank', 'noopener');
       else if (isFacebook) window.open('https://www.facebook.com/search/videos/?q=' + encodeURIComponent(q), '_blank', 'noopener');
       _rerenderResults();
     });
   });
 
-  /* Manual import button */
+  /* Manual import */
   var manualBtn = $('#vrManualImport');
-  if (manualBtn) {
-    manualBtn.addEventListener('click', function() {
-      window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
-      toast('Đang kiểm tra dữ liệu từ Extension...', 'info');
-    });
-  }
+  if (manualBtn) manualBtn.addEventListener('click', function() {
+    window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
+    toast('Đang kiểm tra dữ liệu từ Extension...', 'info');
+  });
 
   /* Clear all */
   var clearBtn = $('#vrClearBtn');
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function() {
-      _videos = [];
-      _rerenderResults();
-    });
-  }
+  if (clearBtn) clearBtn.addEventListener('click', function() {
+    _videos = [];
+    _totalCollectedCount = 0;
+    _page   = 1;
+    _rerenderResults();
+  });
 }
 
 /* ============================================================
-   HASH-BASED AUTO-IMPORT (triggered by extension opening this URL)
+   HASH-BASED AUTO-IMPORT
    ============================================================ */
 (function _watchHash() {
   function onHash() {
@@ -390,7 +634,6 @@ function _bindResultEvents() {
     }
   }
   window.addEventListener('hashchange', onHash);
-  /* Check once on module load */
   if (window.location.hash.includes('import')) {
     setTimeout(function() {
       window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
