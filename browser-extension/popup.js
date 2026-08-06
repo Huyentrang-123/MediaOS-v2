@@ -1,8 +1,6 @@
 /* MediaOS Extension — Popup Controller */
 'use strict';
 
-const MEDIAOS_ORIGINS = ['http://localhost:3001', 'http://localhost:3000'];
-
 const $ = id => document.getElementById(id);
 
 let currentTab  = null;
@@ -20,7 +18,9 @@ function detectPlatform(url) {
 
 function isMediaOS(url) {
   if (!url) return false;
-  return MEDIAOS_ORIGINS.some(o => url.startsWith(o));
+  return url.includes('localhost:3001') ||
+         url.includes('localhost:3000') ||
+         url.includes('.onrender.com');
 }
 
 /* ── UI helpers ─────────────────────────────────────── */
@@ -95,16 +95,15 @@ async function collect() {
 /* ── Open MediaOS ───────────────────────────────────── */
 
 async function openMediaOS() {
-  const tabs   = await chrome.tabs.query({});
+  const tabs     = await chrome.tabs.query({});
   const existing = tabs.find(t => isMediaOS(t.url || ''));
 
   if (existing) {
-    /* Focus and navigate to import hash */
     const base = (existing.url || '').split('#')[0];
     await chrome.tabs.update(existing.id, { active: true, url: base + '#research/import' });
     await chrome.windows.update(existing.windowId, { focused: true });
   } else {
-    await chrome.tabs.create({ url: MEDIAOS_ORIGINS[0] + '/#research/import' });
+    await chrome.tabs.create({ url: 'http://localhost:3001/#research/import' });
   }
   window.close();
 }

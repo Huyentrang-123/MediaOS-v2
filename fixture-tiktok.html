@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><title>TikTok Search Fixture</title></head>
+<body>
+<!-- Simulate TikTok search result cards -->
+
+<!-- Card 1: full stats via data-e2e -->
+<div data-e2e="search_video-item">
+  <a href="https://www.tiktok.com/@sereumnam_vn/video/7345678901234567890">
+    <img src="https://example.com/thumb1.jpg" alt="">
+  </a>
+  <span data-e2e="video-views">2.3M</span>
+  <span data-e2e="like-count">450K</span>
+  <span data-e2e="comment-count">12.5K</span>
+  <a href="https://www.tiktok.com/@sereumnam_vn">Serum Nam Store</a>
+  <span>Serum nám hiệu quả nhất 2024 #serumnam #skincare</span>
+  <time datetime="2024-11-15T08:00:00Z">1d ago</time>
+</div>
+
+<!-- Card 2: stats via strong tags fallback -->
+<div>
+  <a href="/@beauty_kr/video/7345678901234567891">
+    <img src="https://example.com/thumb2.jpg">
+  </a>
+  <strong>1.1M</strong>
+  <strong>89K</strong>
+  <strong>5.2K</strong>
+  <a href="/@beauty_kr">기미 크림 리뷰</a>
+  <span>기미 세럼 전후 비교 #기미케어</span>
+</div>
+
+<!-- Card 3: minimal — no stats (should still be included) -->
+<div>
+  <a href="https://www.tiktok.com/@nocreator/video/7345678901234567892">
+    <img src="">
+  </a>
+  <span>Some caption here</span>
+</div>
+
+</body>
+</html>

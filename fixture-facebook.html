@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head><title>Facebook Search Fixture</title></head>
+<body>
+
+<!-- Card 1: reel with aria-label stats (primary path) -->
+<article role="article">
+  <a href="https://www.facebook.com/reel/123456789012345">
+    <img src="https://scontent.fbcdn.net/thumb1.jpg" alt="">
+  </a>
+  <a href="https://www.facebook.com/beautypage.vn">BeautyPage VN</a>
+  <span aria-label="1.2M views">1.2M views</span>
+  <span aria-label="45K reactions">45K reactions</span>
+  <span aria-label="3.2K comments">3.2K comments</span>
+  <span aria-label="890 shares">890 shares</span>
+  <span>Serum nám hiệu quả #skincare #serumnam</span>
+  <abbr data-utime="1700000000">Nov 14</abbr>
+</article>
+
+<!-- Card 2: watch URL, Vietnamese nghìn/triệu text fallback path -->
+<article role="article">
+  <a href="https://www.facebook.com/watch/?v=987654321098765">
+    <img src="https://scontent.fbcdn.net/thumb2.jpg" alt="">
+  </a>
+  <a href="https://www.facebook.com/koreanskincare">Korean Skincare VN</a>
+  <span>1,5 triệu lượt xem</span>
+  <span>12 nghìn phản ứng</span>
+  <span>1,2 nghìn bình luận</span>
+  <span>기미 세럼 리뷰 #기미케어</span>
+  <abbr data-utime="1699900000">Nov 13</abbr>
+</article>
+
+<!-- Card 3: /videos/ URL, no stats (should still be included) -->
+<article role="article">
+  <a href="https://www.facebook.com/nocreator/videos/111222333444555">
+    <img src="" alt="">
+  </a>
+  <a href="https://www.facebook.com/nocreator">No Creator</a>
+  <span>Some caption text here</span>
+</article>
+
+</body>
+</html>

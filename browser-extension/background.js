@@ -1,12 +1,8 @@
 /* MediaOS Extension — Background Service Worker */
+'use strict';
 
-const MEDIAOS_URLS = [
-  'http://localhost:3001',
-  'http://localhost:3000'
-];
-
-/* Store collected videos; append on each collection */
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+/* Store collected videos; append on each collection, cap at 100 */
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'storePendingResults') {
     chrome.storage.local.get(['pendingVideos'], (existing) => {
       const prev     = existing.pendingVideos || [];
@@ -24,9 +20,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.storage.local.get(['pendingVideos', 'pendingMeta'], (data) => {
       const videos = data.pendingVideos || [];
       const meta   = data.pendingMeta   || {};
-      sendResponse({ ok: true, videos, meta });
-      /* Clear after delivery */
       chrome.storage.local.remove(['pendingVideos', 'pendingMeta']);
+      sendResponse({ ok: true, videos, meta });
     });
     return true;
   }
@@ -43,15 +38,3 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
-
-/* Open or focus MediaOS tab, then navigate to import hash */
-export async function openMediaOS(path = '#research/import') {
-  const tabs = await chrome.tabs.query({});
-  const mediaosTab = tabs.find(t => MEDIAOS_URLS.some(u => t.url && t.url.startsWith(u)));
-  if (mediaosTab) {
-    await chrome.tabs.update(mediaosTab.id, { active: true, url: mediaosTab.url.split('#')[0] + path });
-    await chrome.windows.update(mediaosTab.windowId, { focused: true });
-  } else {
-    await chrome.tabs.create({ url: MEDIAOS_URLS[0] + '/' + path });
-  }
-}
