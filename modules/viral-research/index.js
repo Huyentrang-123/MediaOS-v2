@@ -105,7 +105,8 @@ function _buildReadyState() {
   var isTikTok  = platform === 'all' || platform === 'tiktok';
   var isFacebook = platform === 'all' || platform === 'facebook';
 
-  var tiktokUrl  = 'https://www.tiktok.com/search/video?q=' + encodeURIComponent(query);
+  /* TikTok: /search?q= opens the "Top" tab (most viral) instead of /search/video which shows recent */
+  var tiktokUrl  = 'https://www.tiktok.com/search?q=' + encodeURIComponent(query);
   var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
 
   var btns = '';
@@ -117,7 +118,7 @@ function _buildReadyState() {
     : '<div class="vr-query-display">Từ khóa: <strong>' + esc(query) + '</strong></div>';
 
   var tipRows = '';
-  if (isTikTok)   tipRows += '<div class="vr-tip-row">📱 <strong>TikTok:</strong> Sau khi trang tải → bấm <strong>↕ Sort</strong> → chọn <strong>"Likes"</strong> hoặc <strong>"Views"</strong> → cuộn xuống 2–3 màn hình.</div>';
+  if (isTikTok)   tipRows += '<div class="vr-tip-row">📱 <strong>TikTok:</strong> Trang mở ra ở tab <strong>"Top"</strong> — đây là video viral nhất. Cuộn xuống 2–3 màn hình rồi mới thu thập.</div>';
   if (isFacebook) tipRows += '<div class="vr-tip-row">📘 <strong>Facebook:</strong> Chọn tab <strong>"Videos"</strong> → bộ lọc <strong>"Most Viewed"</strong> hoặc dùng trang <strong>Watch</strong> để lấy video nhiều view hơn.</div>';
 
   var tipBox = '<div class="vr-tip-box">' +
@@ -127,9 +128,9 @@ function _buildReadyState() {
 
   var sortStep = '';
   if (isTikTok && isFacebook) {
-    sortStep = 'TikTok → bấm <strong>Sort → Likes</strong>. Facebook → chọn <strong>Videos → Most Viewed</strong>.';
+    sortStep = 'TikTok → ở tab <strong>"Top"</strong> cuộn xuống 2–3 màn. Facebook → chọn <strong>Videos → Most Viewed</strong>.';
   } else if (isTikTok) {
-    sortStep = 'Bấm <strong>↕ Sort</strong> → chọn <strong>"Likes"</strong> để lấy video nhiều tương tác nhất.';
+    sortStep = 'Trang mở ở tab <strong>"Top"</strong> (viral nhất) — cuộn xuống 2–3 màn hình trước khi thu thập.';
   } else if (isFacebook) {
     sortStep = 'Chọn tab <strong>"Videos"</strong> → bộ lọc <strong>"Most Viewed"</strong>.';
   }
@@ -355,7 +356,7 @@ function _buildPagination(total) {
 function _buildActionBar() {
   var query    = _lastQuery;
   var platform = _lastPlatform;
-  var tiktokUrl   = 'https://www.tiktok.com/search/video?q=' + encodeURIComponent(query);
+  var tiktokUrl   = 'https://www.tiktok.com/search?q=' + encodeURIComponent(query);
   var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
 
   var collectBtn;
@@ -383,7 +384,7 @@ function _buildActionBar() {
   return '<div class="vr-action-bar">' +
     '<div class="vr-action-row">' +
       collectBtn +
-      '<span class="vr-action-hint">💡 Nhớ sort theo <strong>Likes/Views</strong> trên nền tảng → cuộn thêm → bấm extension lần nữa.</span>' +
+      '<span class="vr-action-hint">💡 TikTok: ở tab <strong>Top</strong> → cuộn thêm → bấm extension lần nữa.</span>' +
     '</div>' +
     (chips ? '<div class="vr-suggestions" style="margin-top:10px"><span class="vr-suggestions-label">Thử thêm:</span>' + chips + '</div>' : '') +
     '<div class="vr-action-row" style="margin-top:10px">' +
@@ -632,7 +633,7 @@ function _bindResultEvents() {
       saveState();
       var isTikTok   = _lastPlatform === 'all' || _lastPlatform === 'tiktok';
       var isFacebook = _lastPlatform === 'all' || _lastPlatform === 'facebook';
-      if (isTikTok)        window.open('https://www.tiktok.com/search/video?q=' + encodeURIComponent(q), '_blank', 'noopener');
+      if (isTikTok)        window.open('https://www.tiktok.com/search?q=' + encodeURIComponent(q), '_blank', 'noopener');
       else if (isFacebook) window.open('https://www.facebook.com/search/videos/?q=' + encodeURIComponent(q), '_blank', 'noopener');
       _rerenderResults();
     });
