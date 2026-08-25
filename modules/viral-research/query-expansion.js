@@ -105,18 +105,38 @@ function _dictLang(region) {
 }
 
 /*
+ * Market anchor tags appended to localized queries so TikTok Search biases
+ * toward content from the target market rather than returning adjacent-market
+ * results (e.g. Korean keywords pulling Indonesian K-beauty content).
+ */
+var VR_MARKET_TAGS = {
+  kr: '한국',
+  cn: '中国',
+  tw: '台灣',
+  vn: 'việt nam'
+};
+
+/*
  * Get the best single localized query for a region.
  * Tries phrase expansions first, then dict substitution, falls back to original.
+ * Appends a market anchor tag so TikTok Search stays in the target market.
  */
 function vrLocalizeQuery(keyword, region) {
-  if (!region || region === 'vn' || region === 'global') return keyword;
+  var tag = VR_MARKET_TAGS[region] || null;
+
+  if (!region || region === 'global') return keyword;
+
+  /* VN: no translation needed, just append tag */
+  if (region === 'vn') return tag ? keyword + ' ' + tag : keyword;
 
   var mkey = _marketKey(region);
   for (var i = 0; i < VR_PHRASE_EXPANSIONS.length; i++) {
     var exp = VR_PHRASE_EXPANSIONS[i];
     if (exp.pattern.test(keyword)) {
       var variants = exp[mkey];
-      if (variants && variants.length > 0) return variants[0];
+      if (variants && variants.length > 0) {
+        return tag ? variants[0] + ' ' + tag : variants[0];
+      }
     }
   }
 
@@ -128,11 +148,14 @@ function vrLocalizeQuery(keyword, region) {
     var term = terms[j];
     if (kwNorm.indexOf(vrNormVi(term)) !== -1 || kwLow.indexOf(term.toLowerCase()) !== -1) {
       var trans = VR_DICT[term][lang];
-      if (trans && trans.length > 0) return trans[0];
+      if (trans && trans.length > 0) {
+        return tag ? trans[0] + ' ' + tag : trans[0];
+      }
     }
   }
 
-  return keyword;
+  /* No translation found: still append market tag to the original keyword */
+  return tag ? keyword + ' ' + tag : keyword;
 }
 
 /*
