@@ -23,9 +23,19 @@
     });
   }
 
+  function deliverVideoMeta() {
+    chrome.runtime.sendMessage({ type: 'getVideoMeta' }, (resp) => {
+      if (chrome.runtime.lastError || !resp || !resp.meta) return;
+      window.dispatchEvent(new CustomEvent('mediaos:videoMeta', {
+        detail: resp.meta
+      }));
+    });
+  }
+
   /* Page requested an import check */
   window.addEventListener('mediaos:checkForImport', requestAndDeliver);
   window.addEventListener('mediaos:peekForImport', peekAndDeliver);
+  window.addEventListener('mediaos:checkForVideoMeta', deliverVideoMeta);
 
   /* Auto-trigger when hash signals import */
   function checkHash() {

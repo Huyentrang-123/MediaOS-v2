@@ -10,7 +10,8 @@
     "https://www.tiktok.com/*",
     "https://www.facebook.com/*",
     "http://localhost:*/*",
-    "https://*.onrender.com/*"
+    "https://*.onrender.com/*",
+    "https://m.tiktok.com/*"
   ],
 
   "action": {
@@ -26,6 +27,12 @@
     {
       "matches": ["https://www.tiktok.com/search*"],
       "js": ["content/tiktok-parser.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://www.tiktok.com/@*/video/*"],
+      "js": ["content/tiktok-video-analyzer.js"],
       "run_at": "document_idle",
       "all_frames": false
     },

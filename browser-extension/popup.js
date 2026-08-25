@@ -16,6 +16,11 @@ function detectPlatform(url) {
   return null;
 }
 
+function isTikTokVideoPage(url) {
+  if (!url) return false;
+  return /tiktok\.com\/@[^/]+\/video\/\d+/.test(url);
+}
+
 function isMediaOS(url) {
   if (!url) return false;
   return url.includes('localhost:3001') ||
@@ -35,6 +40,10 @@ function setCollectEnabled(enabled) {
   $('collectBtn').disabled = !enabled;
 }
 
+function setAnalyzeEnabled(enabled) {
+  $('analyzeBtn').disabled = !enabled;
+}
+
 /* ── Pending badge ──────────────────────────────────── */
 
 function refreshPendingBadge() {
@@ -48,6 +57,46 @@ function refreshPendingBadge() {
     } else {
       bar.style.display   = 'none';
     }
+  });
+}
+
+/* ── Analyze video page ─────────────────────────────── */
+
+async function analyze() {
+  if (!currentTab) return;
+
+  setAnalyzeEnabled(false);
+  setStatus('Đang đọc hashtags từ video...', 'status-collecting');
+
+  let resp;
+  try {
+    resp = await chrome.tabs.sendMessage(currentTab.id, { action: 'analyze' });
+  } catch (err) {
+    setStatus('Không thể đọc trang video. Hãy tải lại trang.', 'status-error');
+    setAnalyzeEnabled(true);
+    return;
+  }
+
+  if (!resp || !resp.ok) {
+    setStatus(resp?.error || 'Không đọc được thông tin video.', 'status-error');
+    setAnalyzeEnabled(true);
+    return;
+  }
+
+  const count = (resp.hashtags || []).length;
+  if (count === 0) {
+    setStatus('Không tìm thấy hashtag trên trang này. Thử cuộn xuống để load đầy đủ.', 'status-unsupported');
+    setAnalyzeEnabled(true);
+    return;
+  }
+
+  chrome.runtime.sendMessage({
+    type: 'storeVideoMeta',
+    meta: { hashtags: resp.hashtags, caption: resp.caption, creator: resp.creator, url: resp.url }
+  }, () => {
+    setStatus(`✅ Lấy được ${count} hashtag. Mở MediaOS để xem.`, 'status-done');
+    setAnalyzeEnabled(true);
+    refreshPendingBadge();
   });
 }
 
@@ -121,21 +170,27 @@ async function init() {
   currentTab  = tab;
   platform    = detectPlatform(tab?.url || '');
 
-  if (platform === 'tiktok') {
+  if (isTikTokVideoPage(tab?.url || '')) {
+    $('analyzeBtn').style.display = 'block';
+    $('collectBtn').style.display = 'none';
+    setStatus('Video TikTok — bấm Phân tích để lấy hashtags.', 'status-supported');
+    setAnalyzeEnabled(true);
+  } else if (platform === 'tiktok') {
     setStatus('TikTok Search — sẵn sàng thu thập kết quả.', 'status-supported');
     setCollectEnabled(true);
   } else if (platform === 'facebook') {
     setStatus('Facebook Videos — sẵn sàng thu thập kết quả.', 'status-supported');
     setCollectEnabled(true);
   } else if (isMediaOS(tab?.url || '')) {
-    setStatus('MediaOS đang mở — thu thập từ TikTok/Facebook trước.', 'status-unsupported');
+    setStatus('MediaOS đang mở — mở video TikTok hoặc trang search để bắt đầu.', 'status-unsupported');
   } else {
-    setStatus('Mở trang TikTok Search hoặc Facebook Videos để bắt đầu.', 'status-unsupported');
+    setStatus('Mở video TikTok để phân tích, hoặc trang search để thu thập.', 'status-unsupported');
   }
 
   refreshPendingBadge();
 }
 
+$('analyzeBtn').addEventListener('click', analyze);
 $('collectBtn').addEventListener('click', collect);
 $('openMediaOSBtn').addEventListener('click', openMediaOS);
 

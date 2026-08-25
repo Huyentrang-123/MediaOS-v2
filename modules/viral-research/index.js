@@ -7,11 +7,13 @@
 'use strict';
 
 /* ── Module state ──────────────────────────────────────── */
-var _videos             = [];   /* scored + ranked + badged video array */
-var _hasSearched        = false;
-var _lastKeyword        = '';
-var _lastQuery          = '';
-var _lastPlatform       = 'all';
+var _videos              = [];   /* scored + ranked + badged video array */
+var _hasSearched         = false;
+var _sampleVideoUrl      = '';
+var _sampleHashtags      = [];   /* ['#skincare', '#serum', ...] */
+var _sampleCaption       = '';
+var _sampleCreator       = '';
+var _lastSearchedTag     = '';
 var _totalCollectedCount = 0;   /* cumulative unique adds (before 100-cap) */
 
 /* Filter / sort state */
@@ -28,43 +30,54 @@ var _pageSize        = 30;
    RENDER — router entry point
    ============================================================ */
 function renderResearch(container) {
-  var fs = state.viralResearch;
-
   container.innerHTML =
     '<div class="vr-page">' +
-      _buildSearchSection(fs) +
+      _buildSampleSection() +
       '<div id="vrResults">' + _buildResultsArea() + '</div>' +
     '</div>';
 
-  _bindSearchEvents();
+  _bindSampleEvents();
   if (_hasSearched) _bindResultEvents();
 
-  window.addEventListener('mediaos:import', _onExtensionImport, { once: false });
+  window.addEventListener('mediaos:import',    _onExtensionImport, { once: false });
+  window.addEventListener('mediaos:videoMeta', _onVideoMeta,       { once: false });
+
+  /* On load, check if extension has video meta waiting */
+  window.dispatchEvent(new CustomEvent('mediaos:checkForVideoMeta'));
 }
 
 /* ============================================================
-   SEARCH SECTION
+   SAMPLE VIDEO SECTION
    ============================================================ */
-function _buildSearchSection(fs) {
-  var platformChips = CONFIG.platforms.map(function(p) {
-    return '<button class="vr-chip' + (fs.platform === p.id ? ' active' : '') +
-      '" data-platform="' + p.id + '">' + p.label + '</button>';
-  }).join('');
+function _buildSampleSection() {
+  var hashtagRow = '';
+  if (_sampleHashtags.length > 0) {
+    var chips = _sampleHashtags.slice(0, 10).map(function(tag) {
+      return '<button class="vr-suggestion-chip" data-query="' + esc(tag) + '">' + esc(tag) + '</button>';
+    }).join('');
+    var creatorLabel = _sampleCreator ? '<span class="vr-query-display">Video: <strong>' + esc(_sampleCreator) + '</strong></span>' : '';
+    hashtagRow =
+      '<div class="vr-filter-row" style="flex-wrap:wrap;gap:8px;align-items:flex-start">' +
+        creatorLabel +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+          '<span class="vr-filter-label">Hashtags:</span>' +
+          chips +
+        '</div>' +
+        '<span style="font-size:12px;color:var(--text-2)">↑ Bấm hashtag để tìm video tương tự trên TikTok</span>' +
+      '</div>';
+  }
 
   return '<div class="vr-search-section">' +
     '<div class="vr-search-bar">' +
       '<div class="vr-search-input-wrap">' +
-        '<span class="vr-search-icon">🔍</span>' +
-        '<input type="text" id="vrKeyword" class="vr-search-input"' +
-          ' placeholder="Nhập từ khóa bằng bất kỳ ngôn ngữ nào: serum nám, 기미 세럼, 淡斑霜..."' +
-          ' value="' + esc(fs.keyword) + '" autocomplete="off">' +
+        '<span class="vr-search-icon">🎬</span>' +
+        '<input type="text" id="vrVideoUrl" class="vr-search-input"' +
+          ' placeholder="Paste link video TikTok hoặc Facebook..."' +
+          ' value="' + esc(_sampleVideoUrl) + '" autocomplete="off">' +
       '</div>' +
-      '<button class="btn btn-primary vr-search-btn" id="vrSearchBtn">Tìm kiếm</button>' +
+      '<button class="btn btn-primary vr-search-btn" id="vrOpenVideoBtn">Mở video →</button>' +
     '</div>' +
-    '<div class="vr-filter-row">' +
-      '<span class="vr-filter-label">Nền tảng</span>' +
-      '<div class="vr-chip-group" id="platformChips">' + platformChips + '</div>' +
-    '</div>' +
+    hashtagRow +
   '</div>';
 }
 
@@ -79,66 +92,52 @@ function _buildResultsArea() {
 
 function _buildIdleState() {
   return '<div class="vr-empty">' +
-    '<div class="vr-empty-icon">🔍</div>' +
-    '<div class="vr-empty-title">Bắt đầu nghiên cứu viral</div>' +
-    '<div class="vr-empty-desc">' +
-      'Nhập từ khóa, chọn nền tảng và thị trường, rồi bấm <strong>Tìm kiếm</strong>.' +
-    '</div>' +
+    '<div class="vr-empty-icon">🎬</div>' +
+    '<div class="vr-empty-title">Tìm video tương tự</div>' +
+    '<div class="vr-empty-desc">Cách dùng:</div>' +
+    '<ol class="vr-instructions-list" style="text-align:left;max-width:420px;margin:12px auto 0">' +
+      '<li>Paste link video TikTok mẫu vào ô trên → bấm <strong>Mở video →</strong></li>' +
+      '<li>Video mở trong tab mới → bấm extension <strong>MediaOS</strong> → <strong>Phân tích video này</strong></li>' +
+      '<li>Quay lại tab này — hashtags của video xuất hiện bên trên</li>' +
+      '<li>Bấm một hashtag → trang search TikTok mở ra</li>' +
+      '<li>Cuộn xuống 2–3 màn → bấm extension → <strong>Thu thập kết quả</strong></li>' +
+    '</ol>' +
   '</div>';
 }
 
 function _buildReadyState() {
-  var kw      = _lastKeyword;
-  var query   = _lastQuery;
-  var platform = _lastPlatform;
-
-  var isTikTok  = platform === 'all' || platform === 'tiktok';
-  var isFacebook = platform === 'all' || platform === 'facebook';
-
-  /* TikTok: /search?q= opens the "Top" tab (most viral) instead of /search/video which shows recent */
-  var tiktokUrl  = 'https://www.tiktok.com/search?q=' + encodeURIComponent(query);
-  var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
-
-  var btns = '';
-  if (isTikTok)   btns += '<a class="btn btn-primary vr-open-btn" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Mở TikTok Search ↗</a>';
-  if (isFacebook) btns += '<a class="btn btn-outline vr-open-btn" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Mở Facebook Videos ↗</a>';
-
-  var queryDisplay = '<div class="vr-query-display">Từ khóa: <strong>' + esc(query) + '</strong></div>';
-
-  var tipRows = '';
-  if (isTikTok)   tipRows += '<div class="vr-tip-row">📱 <strong>TikTok:</strong> Trang mở ra ở tab <strong>"Top"</strong> — đây là video viral nhất. Cuộn xuống 2–3 màn hình rồi mới thu thập.</div>';
-  if (isFacebook) tipRows += '<div class="vr-tip-row">📘 <strong>Facebook:</strong> Chọn tab <strong>"Videos"</strong> → bộ lọc <strong>"Most Viewed"</strong> hoặc dùng trang <strong>Watch</strong> để lấy video nhiều view hơn.</div>';
-
-  var tipBox = '<div class="vr-tip-box">' +
-    '<div class="vr-tip-title">💡 Để lấy video triệu view — đừng bỏ qua bước này</div>' +
-    tipRows +
-  '</div>';
-
-  var sortStep = '';
-  if (isTikTok && isFacebook) {
-    sortStep = 'TikTok → ở tab <strong>"Top"</strong> cuộn xuống 2–3 màn. Facebook → chọn <strong>Videos → Most Viewed</strong>.';
-  } else if (isTikTok) {
-    sortStep = 'Trang mở ở tab <strong>"Top"</strong> (viral nhất) — cuộn xuống 2–3 màn hình trước khi thu thập.';
-  } else if (isFacebook) {
-    sortStep = 'Chọn tab <strong>"Videos"</strong> → bộ lọc <strong>"Most Viewed"</strong>.';
-  }
-
-  return queryDisplay +
-    '<div class="vr-platform-btns">' + btns + '</div>' +
-    tipBox +
-    '<div class="vr-instructions">' +
-      '<div class="vr-instructions-title">📌 Hướng dẫn từng bước</div>' +
-      '<ol class="vr-instructions-list">' +
-        '<li>Bấm nút bên trên để mở trang tìm kiếm trên nền tảng.</li>' +
-        '<li><strong>⚡ Quan trọng — sort trước khi thu thập:</strong> ' + sortStep + '</li>' +
-        '<li>Cuộn xuống <strong>2–3 màn hình</strong> để load nhiều video hơn.</li>' +
-        '<li>Bấm extension <strong>MediaOS</strong> trên thanh Chrome → <strong>"Thu thập kết quả đang hiển thị"</strong>.</li>' +
-      '</ol>' +
-      '<div class="vr-waiting-indicator">⏳ Đang chờ dữ liệu từ Extension...</div>' +
+  /* No videos yet — show hashtag chips if available, else nudge user */
+  if (_sampleHashtags.length === 0) {
+    return '<div class="vr-instructions">' +
+      '<div class="vr-waiting-indicator">⏳ Đang chờ phân tích từ Extension...</div>' +
+      '<p style="font-size:13px;color:var(--text-2);margin-top:8px">' +
+        'Mở video TikTok trong tab mới → bấm extension → <strong>Phân tích video này</strong>.' +
+      '</p>' +
       '<button class="btn btn-outline btn-sm" id="vrManualImport" style="margin-top:10px">' +
-        'Nhận kết quả từ Extension thủ công' +
+        'Nhận kết quả từ Extension' +
       '</button>' +
     '</div>';
+  }
+
+  var chips = _sampleHashtags.slice(0, 10).map(function(tag) {
+    return '<button class="vr-suggestion-chip" data-query="' + esc(tag) + '">' + esc(tag) + ' ↗</button>';
+  }).join('');
+
+  var creatorLine = _sampleCreator
+    ? '<p style="font-size:13px;color:var(--text-2);margin-bottom:10px">Video mẫu: <strong>' + esc(_sampleCreator) + '</strong></p>'
+    : '';
+
+  return '<div class="vr-instructions">' +
+    creatorLine +
+    '<div class="vr-instructions-title">🏷 Bấm hashtag để tìm video tương tự:</div>' +
+    '<div class="vr-suggestions" style="margin:10px 0">' + chips + '</div>' +
+    '<div class="vr-tip-box" style="margin-top:12px">' +
+      '<div class="vr-tip-row">📱 Mỗi hashtag mở TikTok Search tab "Top" (viral nhất). Cuộn xuống 2–3 màn rồi bấm extension <strong>Thu thập kết quả</strong>.</div>' +
+    '</div>' +
+    '<button class="btn btn-outline btn-sm" id="vrManualImport" style="margin-top:10px">' +
+      'Nhận kết quả từ Extension' +
+    '</button>' +
+  '</div>';
 }
 
 /* ============================================================
@@ -359,40 +358,18 @@ function _buildPagination(total) {
    - All           → dropdown with two choices
    ============================================================ */
 function _buildActionBar() {
-  var query    = _lastQuery;
-  var platform = _lastPlatform;
-  var tiktokUrl   = 'https://www.tiktok.com/search?q=' + encodeURIComponent(query);
-  var facebookUrl = 'https://www.facebook.com/search/videos/?q=' + encodeURIComponent(query);
-
-  var collectBtn;
-  if (platform === 'tiktok') {
-    collectBtn = '<a class="btn btn-primary vr-collect-btn" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm kết quả ↗</a>';
-  } else if (platform === 'facebook') {
-    collectBtn = '<a class="btn btn-primary vr-collect-btn" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm kết quả ↗</a>';
-  } else {
-    /* All platforms — dropdown */
-    collectBtn =
-      '<div class="vr-collect-wrap">' +
-        '<button class="btn btn-primary vr-collect-btn" id="vrCollectMoreBtn">Thu thập thêm kết quả ▾</button>' +
-        '<div class="vr-collect-menu" id="vrCollectMenu" hidden>' +
-          '<a class="vr-collect-item" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm từ TikTok ↗</a>' +
-          '<a class="vr-collect-item" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Thu thập thêm từ Facebook ↗</a>' +
-        '</div>' +
-      '</div>';
-  }
-
-  var variants = typeof vrAllVariants === 'function' ? vrAllVariants(_lastKeyword, _lastMarket) : [];
-  var chips = variants.slice(1, 7).map(function(q) {
-    return '<button class="vr-suggestion-chip" data-query="' + esc(q) + '">' + esc(q) + '</button>';
+  var chips = _sampleHashtags.slice(0, 8).map(function(tag) {
+    return '<button class="vr-suggestion-chip" data-query="' + esc(tag) + '">' + esc(tag) + ' ↗</button>';
   }).join('');
 
   return '<div class="vr-action-bar">' +
-    '<div class="vr-action-row">' +
-      collectBtn +
-      '<span class="vr-action-hint">💡 TikTok: ở tab <strong>Top</strong> → cuộn thêm → bấm extension lần nữa.</span>' +
-    '</div>' +
-    (chips ? '<div class="vr-suggestions" style="margin-top:10px"><span class="vr-suggestions-label">Thử thêm:</span>' + chips + '</div>' : '') +
+    (chips
+      ? '<div class="vr-action-row" style="flex-wrap:wrap">' +
+          '<span class="vr-suggestions-label">Tìm thêm video tương tự:</span>' + chips +
+        '</div>'
+      : '') +
     '<div class="vr-action-row" style="margin-top:10px">' +
+      '<span class="vr-action-hint">💡 TikTok: ở tab <strong>Top</strong> → cuộn thêm → bấm extension lần nữa.</span>' +
       '<button class="btn btn-outline btn-sm" id="vrClearBtn">Xóa tất cả kết quả</button>' +
     '</div>' +
   '</div>';
@@ -441,7 +418,7 @@ function _mergeAndProcess(incoming) {
     var hoursOld = v.postedAt ? Math.max(1, (Date.now() - new Date(v.postedAt).getTime()) / 3600000) : null;
     var vph      = (hoursOld && v.views) ? v.views / hoursOld : null;
     return Object.assign({}, v, {
-      matchedQuery: v.matchedQuery || _lastQuery,
+      matchedQuery: v.matchedQuery || _lastSearchedTag || _sampleVideoUrl || '',
       viewsPerHour: v.viewsPerHour || vph
     });
   });
@@ -470,27 +447,43 @@ function _mergeAndProcess(incoming) {
 }
 
 /* ============================================================
-   DO SEARCH
+   OPEN VIDEO (sample video URL input)
    ============================================================ */
-function _doSearch() {
-  var input = $('#vrKeyword');
-  if (input) {
-    state.viralResearch.keyword = input.value;
-    saveState();
-  }
+function _doOpenVideo() {
+  var input = $('#vrVideoUrl');
+  var url   = (input ? input.value : _sampleVideoUrl).trim();
+  if (!url) { toast('Hãy paste link video vào ô trên', 'info'); return; }
 
-  var kw = (state.viralResearch.keyword || '').trim();
-  if (!kw) { toast('Hãy nhập từ khóa', 'info'); return; }
+  /* Normalise URL */
+  if (!url.startsWith('http')) url = 'https://' + url;
 
-  var fs        = state.viralResearch;
-  _lastKeyword  = kw;
-  _lastPlatform = fs.platform || 'all';
-  _lastQuery    = kw;
+  _sampleVideoUrl = url;
+  _hasSearched    = true;
 
-  _hasSearched = true;
+  window.open(url, '_blank', 'noopener');
   _rerenderResults();
+}
 
-  window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
+/* ============================================================
+   VIDEO META RECEIVED FROM EXTENSION
+   ============================================================ */
+function _onVideoMeta(e) {
+  var meta = e.detail || {};
+  if (!meta.hashtags || meta.hashtags.length === 0) return;
+  _sampleHashtags = meta.hashtags || [];
+  _sampleCaption  = meta.caption  || '';
+  _sampleCreator  = meta.creator  || '';
+  if (meta.url && !_sampleVideoUrl) _sampleVideoUrl = meta.url;
+  _hasSearched = true;
+
+  /* Rebuild sample section to show hashtag chips */
+  var sampleEl = document.querySelector('.vr-search-section');
+  if (sampleEl) sampleEl.outerHTML = _buildSampleSection();
+  /* Also bind chip events on the new section */
+  _bindSampleEvents();
+
+  _rerenderResults();
+  toast('Nhận được ' + _sampleHashtags.length + ' hashtags từ Extension', 'success');
 }
 
 /* ============================================================
@@ -504,31 +497,26 @@ function _rerenderResults() {
 }
 
 /* ============================================================
-   EVENT BINDING — search section
+   EVENT BINDING — sample section
    ============================================================ */
-function _bindSearchEvents() {
-  var btn = $('#vrSearchBtn');
-  if (btn) btn.addEventListener('click', _doSearch);
+function _bindSampleEvents() {
+  var btn = $('#vrOpenVideoBtn');
+  if (btn) btn.addEventListener('click', _doOpenVideo);
 
-  var input = $('#vrKeyword');
+  var input = $('#vrVideoUrl');
   if (input) {
-    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') _doSearch(); });
-    document.addEventListener('keydown', function(e) {
-      if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && document.activeElement !== input) {
-        e.preventDefault(); input.focus();
-      }
-    });
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') _doOpenVideo(); });
   }
 
-  $$('#platformChips .vr-chip').forEach(function(chip) {
+  /* Hashtag chips in sample section */
+  $$('.vr-search-section .vr-suggestion-chip').forEach(function(chip) {
     chip.addEventListener('click', function() {
-      state.viralResearch.platform = chip.dataset.platform;
-      $$('#platformChips .vr-chip').forEach(function(c) {
-        c.classList.toggle('active', c.dataset.platform === chip.dataset.platform);
-      });
+      var tag = chip.dataset.query;
+      _lastSearchedTag = tag;
+      var searchUrl = 'https://www.tiktok.com/search?q=' + encodeURIComponent(tag);
+      window.open(searchUrl, '_blank', 'noopener');
     });
   });
-
 }
 
 /* ============================================================
@@ -614,20 +602,12 @@ function _bindResultEvents() {
     });
   });
 
-  /* Query variant chips */
-  $$('.vr-suggestion-chip').forEach(function(chip) {
+  /* Hashtag chips in action bar / ready state */
+  $$('#vrResults .vr-suggestion-chip').forEach(function(chip) {
     chip.addEventListener('click', function() {
-      var q     = chip.dataset.query;
-      _lastQuery = q;
-      var input  = $('#vrKeyword');
-      if (input) input.value = q;
-      state.viralResearch.keyword = q;
-      saveState();
-      var isTikTok   = _lastPlatform === 'all' || _lastPlatform === 'tiktok';
-      var isFacebook = _lastPlatform === 'all' || _lastPlatform === 'facebook';
-      if (isTikTok)        window.open('https://www.tiktok.com/search?q=' + encodeURIComponent(q), '_blank', 'noopener');
-      else if (isFacebook) window.open('https://www.facebook.com/search/videos/?q=' + encodeURIComponent(q), '_blank', 'noopener');
-      _rerenderResults();
+      var tag = chip.dataset.query;
+      _lastSearchedTag = tag;
+      window.open('https://www.tiktok.com/search?q=' + encodeURIComponent(tag), '_blank', 'noopener');
     });
   });
 
@@ -647,22 +627,6 @@ function _bindResultEvents() {
     _rerenderResults();
   });
 
-  /* Collect more dropdown (platform = 'all') */
-  var collectMoreBtn = $('#vrCollectMoreBtn');
-  var collectMenu    = $('#vrCollectMenu');
-  if (collectMoreBtn && collectMenu) {
-    collectMoreBtn.addEventListener('click', function(e) {
-      var opening = collectMenu.hidden; /* true = about to open */
-      collectMenu.hidden = !opening;
-      e.stopPropagation();
-      if (opening) {
-        /* Close menu on next click anywhere outside this button */
-        document.addEventListener('click', function() {
-          if (collectMenu) collectMenu.hidden = true;
-        }, { once: true });
-      }
-    });
-  }
 }
 
 /* ============================================================

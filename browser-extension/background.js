@@ -37,4 +37,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local.remove(['pendingVideos', 'pendingMeta'], () => sendResponse({ ok: true }));
     return true;
   }
+
+  if (msg.type === 'storeVideoMeta') {
+    chrome.storage.local.set({ pendingVideoMeta: msg.meta || {} }, () => {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
+  if (msg.type === 'getVideoMeta') {
+    chrome.storage.local.get(['pendingVideoMeta'], (data) => {
+      const meta = data.pendingVideoMeta || null;
+      chrome.storage.local.remove(['pendingVideoMeta']);
+      sendResponse({ ok: true, meta });
+    });
+    return true;
+  }
+
+  if (msg.type === 'peekVideoMeta') {
+    chrome.storage.local.get(['pendingVideoMeta'], (data) => {
+      sendResponse({ ok: true, meta: data.pendingVideoMeta || null });
+    });
+    return true;
+  }
 });
