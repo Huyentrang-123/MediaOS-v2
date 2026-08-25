@@ -662,3 +662,32 @@
 @media (max-width: 360px) {
   .vr-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   TIP BOX — viral sorting guidance
+   ============================================================ */
+.vr-tip-box {
+  background: rgba(245,158,11,.08);
+  border: 1.5px solid rgba(245,158,11,.32);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  max-width: 580px;
+}
+
+.vr-tip-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 8px;
+}
+
+.vr-tip-row {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.75;
+}
+
+.vr-tip-row + .vr-tip-row { margin-top: 4px; }
+
+.vr-action-hint strong { color: var(--text-1); }
