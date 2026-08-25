@@ -116,17 +116,35 @@ function _buildReadyState() {
     ? '<div class="vr-query-display">Từ khóa: <strong>' + esc(kw) + '</strong> → <strong>' + esc(query) + '</strong></div>'
     : '<div class="vr-query-display">Từ khóa: <strong>' + esc(query) + '</strong></div>';
 
+  var tipRows = '';
+  if (isTikTok)   tipRows += '<div class="vr-tip-row">📱 <strong>TikTok:</strong> Sau khi trang tải → bấm <strong>↕ Sort</strong> → chọn <strong>"Likes"</strong> hoặc <strong>"Views"</strong> → cuộn xuống 2–3 màn hình.</div>';
+  if (isFacebook) tipRows += '<div class="vr-tip-row">📘 <strong>Facebook:</strong> Chọn tab <strong>"Videos"</strong> → bộ lọc <strong>"Most Viewed"</strong> hoặc dùng trang <strong>Watch</strong> để lấy video nhiều view hơn.</div>';
+
+  var tipBox = '<div class="vr-tip-box">' +
+    '<div class="vr-tip-title">💡 Để lấy video triệu view — đừng bỏ qua bước này</div>' +
+    tipRows +
+  '</div>';
+
+  var sortStep = '';
+  if (isTikTok && isFacebook) {
+    sortStep = 'TikTok → bấm <strong>Sort → Likes</strong>. Facebook → chọn <strong>Videos → Most Viewed</strong>.';
+  } else if (isTikTok) {
+    sortStep = 'Bấm <strong>↕ Sort</strong> → chọn <strong>"Likes"</strong> để lấy video nhiều tương tác nhất.';
+  } else if (isFacebook) {
+    sortStep = 'Chọn tab <strong>"Videos"</strong> → bộ lọc <strong>"Most Viewed"</strong>.';
+  }
+
   return queryDisplay +
     '<div class="vr-platform-btns">' + btns + '</div>' +
+    tipBox +
     '<div class="vr-instructions">' +
-      '<div class="vr-instructions-title">📌 Hướng dẫn</div>' +
+      '<div class="vr-instructions-title">📌 Hướng dẫn từng bước</div>' +
       '<ol class="vr-instructions-list">' +
         '<li>Bấm nút bên trên để mở trang tìm kiếm trên nền tảng.</li>' +
-        '<li>Trang tìm kiếm tải xong → bấm extension <strong>MediaOS</strong> trên thanh Chrome.</li>' +
-        '<li>Bấm <strong>"Thu thập kết quả đang hiển thị"</strong>.</li>' +
-        '<li>Extension tự động gửi dữ liệu về đây.</li>' +
+        '<li><strong>⚡ Quan trọng — sort trước khi thu thập:</strong> ' + sortStep + '</li>' +
+        '<li>Cuộn xuống <strong>2–3 màn hình</strong> để load nhiều video hơn.</li>' +
+        '<li>Bấm extension <strong>MediaOS</strong> trên thanh Chrome → <strong>"Thu thập kết quả đang hiển thị"</strong>.</li>' +
       '</ol>' +
-      '<a class="vr-guide-link" href="#" onclick="return false">Xem hướng dẫn chi tiết</a>' +
       '<div class="vr-waiting-indicator">⏳ Đang chờ dữ liệu từ Extension...</div>' +
       '<button class="btn btn-outline btn-sm" id="vrManualImport" style="margin-top:10px">' +
         'Nhận kết quả từ Extension thủ công' +
@@ -365,7 +383,7 @@ function _buildActionBar() {
   return '<div class="vr-action-bar">' +
     '<div class="vr-action-row">' +
       collectBtn +
-      '<span class="vr-action-hint">Cuộn thêm trên nền tảng rồi bấm extension lần nữa.</span>' +
+      '<span class="vr-action-hint">💡 Nhớ sort theo <strong>Likes/Views</strong> trên nền tảng → cuộn thêm → bấm extension lần nữa.</span>' +
     '</div>' +
     (chips ? '<div class="vr-suggestions" style="margin-top:10px"><span class="vr-suggestions-label">Thử thêm:</span>' + chips + '</div>' : '') +
     '<div class="vr-action-row" style="margin-top:10px">' +
