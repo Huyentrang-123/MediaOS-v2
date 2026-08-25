@@ -93,10 +93,20 @@ async function analyze() {
   chrome.runtime.sendMessage({
     type: 'storeVideoMeta',
     meta: { hashtags: resp.hashtags, caption: resp.caption, creator: resp.creator, url: resp.url }
-  }, () => {
-    setStatus(`✅ Lấy được ${count} hashtag. Mở MediaOS để xem.`, 'status-done');
+  }, async () => {
+    setStatus(`✅ Lấy được ${count} hashtag. Đang mở MediaOS...`, 'status-done');
     setAnalyzeEnabled(true);
     refreshPendingBadge();
+
+    /* Auto-navigate MediaOS to trigger videoMeta delivery */
+    const tabs     = await chrome.tabs.query({});
+    const existing = tabs.find(t => isMediaOS(t.url || ''));
+    if (existing) {
+      const base = (existing.url || '').split('#')[0];
+      await chrome.tabs.update(existing.id, { active: true, url: base + '#research/videoMeta' });
+      await chrome.windows.update(existing.windowId, { focused: true });
+      window.close();
+    }
   });
 }
 

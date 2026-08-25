@@ -611,10 +611,11 @@ function _bindResultEvents() {
     });
   });
 
-  /* Manual import */
+  /* Manual import — checks both video results and video meta */
   var manualBtn = $('#vrManualImport');
   if (manualBtn) manualBtn.addEventListener('click', function() {
     window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
+    window.dispatchEvent(new CustomEvent('mediaos:checkForVideoMeta'));
     toast('Đang kiểm tra dữ liệu từ Extension...', 'info');
   });
 
@@ -637,11 +638,12 @@ function _bindResultEvents() {
     if (window.location.hash.includes('import')) {
       window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
     }
+    if (window.location.hash.includes('videoMeta')) {
+      window.dispatchEvent(new CustomEvent('mediaos:checkForVideoMeta'));
+    }
   }
   window.addEventListener('hashchange', onHash);
-  if (window.location.hash.includes('import')) {
-    setTimeout(function() {
-      window.dispatchEvent(new CustomEvent('mediaos:checkForImport'));
-    }, 300);
-  }
+  setTimeout(function() {
+    onHash();
+  }, 300);
 })();

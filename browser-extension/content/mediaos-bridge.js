@@ -37,10 +37,13 @@
   window.addEventListener('mediaos:peekForImport', peekAndDeliver);
   window.addEventListener('mediaos:checkForVideoMeta', deliverVideoMeta);
 
-  /* Auto-trigger when hash signals import */
+  /* Auto-trigger when hash signals import or videoMeta */
   function checkHash() {
     if (window.location.hash.includes('import')) {
       requestAndDeliver();
+    }
+    if (window.location.hash.includes('videoMeta')) {
+      deliverVideoMeta();
     }
   }
 
@@ -49,4 +52,5 @@
 
   /* Also auto-deliver on load if data is waiting */
   requestAndDeliver();
+  deliverVideoMeta();
 })();
