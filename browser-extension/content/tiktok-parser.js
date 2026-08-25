@@ -59,20 +59,24 @@
     const likesEl    = card.querySelector('[data-e2e*="like"],[data-e2e="like-count"]');
     const commentsEl = card.querySelector('[data-e2e*="comment"],[data-e2e="comment-count"]');
 
-    let views    = parseCount(viewsEl?.textContent);
-    let likes    = parseCount(likesEl?.textContent);
-    let comments = parseCount(commentsEl?.textContent);
+    /* views only when selector explicitly found — TikTok Search cards do NOT show
+       view counts on thumbnails; the visible number is always likes (heart icon).
+       Never infer views from an unattributed number. */
+    let views    = viewsEl    ? parseCount(viewsEl.textContent)    : null;
+    let likes    = likesEl    ? parseCount(likesEl.textContent)    : null;
+    let comments = commentsEl ? parseCount(commentsEl.textContent) : null;
 
-    /* Fallback: scan all text spans for formatted numbers */
-    if (views === null && likes === null) {
+    /* Fallback: when no data-e2e like selector matched, scan for formatted numbers.
+       On TikTok Search page the only stat visible on a card thumbnail is the
+       like count (heart icon). Assign numbers to likes only — never to views. */
+    if (likes === null) {
       const numEls = Array.from(card.querySelectorAll('strong, span'))
         .map(el => ({ el, val: parseCount(el.textContent.trim()) }))
         .filter(x => x.val !== null && x.val > 0)
-        .sort((a, b) => b.val - a.val); /* desc — views are usually biggest */
+        .sort((a, b) => b.val - a.val);
 
-      if (numEls.length >= 1) views    = numEls[0].val;
-      if (numEls.length >= 2) likes    = numEls[1].val;
-      if (numEls.length >= 3) comments = numEls[2].val;
+      if (numEls.length >= 1) likes = numEls[0].val;
+      /* Do NOT assign views or comments from unattributed numbers */
     }
 
     return { views, likes, comments };
@@ -150,7 +154,7 @@
 
       const statsAvailable = views !== null || likes !== null || comments !== null;
 
-      results.push({
+      const video = {
         id:             `tiktok:${videoId}`,
         platform:       'tiktok',
         market:         null,
@@ -167,7 +171,13 @@
         matchedQuery:   null,
         statsAvailable,
         sourceProvider: 'tiktok-extension'
-      });
+      };
+
+      if (results.length < 3) {
+        console.log('[MediaOS debug]', { url: video.url, views: video.views, likes: video.likes, comments: video.comments, shares: video.shares, statsAvailable: video.statsAvailable });
+      }
+
+      results.push(video);
     });
 
     return results;

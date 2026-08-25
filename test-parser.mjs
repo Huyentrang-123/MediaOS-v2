@@ -44,18 +44,16 @@ function extractStats(card) {
   const likesEl    = card.querySelector('[data-e2e*="like"],[data-e2e="like-count"]');
   const commentsEl = card.querySelector('[data-e2e*="comment"],[data-e2e="comment-count"]');
 
-  let views    = parseCount(viewsEl?.textContent);
-  let likes    = parseCount(likesEl?.textContent);
-  let comments = parseCount(commentsEl?.textContent);
+  let views    = viewsEl    ? parseCount(viewsEl.textContent)    : null;
+  let likes    = likesEl    ? parseCount(likesEl.textContent)    : null;
+  let comments = commentsEl ? parseCount(commentsEl.textContent) : null;
 
-  if (views === null && likes === null) {
+  if (likes === null) {
     const numEls = Array.from(card.querySelectorAll('strong, span'))
       .map(el => ({ el, val: parseCount(el.textContent.trim()) }))
       .filter(x => x.val !== null && x.val > 0)
       .sort((a, b) => b.val - a.val);
-    if (numEls.length >= 1) views    = numEls[0].val;
-    if (numEls.length >= 2) likes    = numEls[1].val;
-    if (numEls.length >= 3) comments = numEls[2].val;
+    if (numEls.length >= 1) likes = numEls[0].val;
   }
   return { views, likes, comments };
 }
@@ -89,11 +87,15 @@ results.forEach((r, i) => {
 });
 
 const allHaveId  = results.every(r => r.id.startsWith('tiktok:'));
-const card1Stats = results[0]?.views === 2300000 && results[0]?.likes === 450000;
+/* Card 1: data-e2e selectors present → views=2.3M, likes=450K, comments=12.5K */
+const card1Stats = results[0]?.views === 2300000 && results[0]?.likes === 450000 && results[0]?.comments === 12500;
+/* Card 2: only <strong>1.1M</strong> visible (like count on thumbnail) → likes=1.1M, views=null */
+const card2Stats = results[1]?.views === null && results[1]?.likes === 1100000;
 const card3Included = results.some(r => r.id === 'tiktok:7345678901234567892');
 
 console.log('\n=== Assertions ===');
 console.log('All have tiktok: prefix:', allHaveId ? 'PASS' : 'FAIL');
-console.log('Card 1 stats parsed (2.3M views, 450K likes):', card1Stats ? 'PASS' : 'FAIL');
+console.log('Card 1 stats (views=2.3M, likes=450K, comments=12.5K):', card1Stats ? 'PASS' : 'FAIL');
+console.log('Card 2 fallback → likes=1.1M, views=null (no fake views):', card2Stats ? 'PASS' : 'FAIL');
 console.log('Card 3 (no stats) still included:', card3Included ? 'PASS' : 'FAIL');
 console.log('Total cards (expect 3):', results.length === 3 ? 'PASS' : 'FAIL (got ' + results.length + ')');

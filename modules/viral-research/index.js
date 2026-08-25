@@ -192,14 +192,21 @@ function _buildResultsContent() {
    ============================================================ */
 function _buildStatsRow(filtered) {
   var all = _videos;
-  var maxV = null, maxC = null, over100k = 0, over500c = 0;
+  var maxV = null, maxL = null, maxC = null, over100k = 0, over500c = 0;
+  var hasViews = false, hasLikes = false, hasComments = false;
 
   all.forEach(function(v) {
     if (v.views != null) {
+      hasViews = true;
       if (maxV == null || v.views > maxV) maxV = v.views;
       if (v.views > 100000) over100k++;
     }
+    if (v.likes != null) {
+      hasLikes = true;
+      if (maxL == null || v.likes > maxL) maxL = v.likes;
+    }
     if (v.comments != null) {
+      hasComments = true;
       if (maxC == null || v.comments > maxC) maxC = v.comments;
       if (v.comments > 500) over500c++;
     }
@@ -207,14 +214,24 @@ function _buildStatsRow(filtered) {
 
   var collectedDisplay = _totalCollectedCount > 0 ? _totalCollectedCount : all.length;
 
-  return '<div class="vr-stats-row">' +
+  var html = '<div class="vr-stats-row">' +
     _statBox(collectedDisplay, 'Extension đã thu thập') +
-    _statBox(filtered.length, 'Sau lọc') +
-    _statBox(maxV != null ? formatNumber(maxV) : '—', 'View cao nhất') +
-    _statBox(maxC != null ? formatNumber(maxC) : '—', 'Comment cao nhất') +
-    _statBox(over100k, 'Trên 100K views') +
-    _statBox(over500c, 'Trên 500 comments') +
-  '</div>';
+    _statBox(filtered.length, 'Sau lọc');
+
+  if (hasViews) {
+    html += _statBox(maxV != null ? formatNumber(maxV) : '—', 'View cao nhất');
+    html += _statBox(over100k, 'Trên 100K views');
+  }
+  if (hasLikes) {
+    html += _statBox(maxL != null ? formatNumber(maxL) : '—', 'Like cao nhất');
+  }
+  if (hasComments) {
+    html += _statBox(maxC != null ? formatNumber(maxC) : '—', 'Comment cao nhất');
+    html += _statBox(over500c, 'Trên 500 comments');
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function _statBox(val, label) {
