@@ -11,7 +11,6 @@ var _videos             = [];   /* scored + ranked + badged video array */
 var _hasSearched        = false;
 var _lastKeyword        = '';
 var _lastQuery          = '';
-var _lastMarket         = 'global';
 var _lastPlatform       = 'all';
 var _totalCollectedCount = 0;   /* cumulative unique adds (before 100-cap) */
 
@@ -52,17 +51,12 @@ function _buildSearchSection(fs) {
       '" data-platform="' + p.id + '">' + p.label + '</button>';
   }).join('');
 
-  var regionChips = CONFIG.regions.map(function(r) {
-    return '<button class="vr-chip' + (fs.region === r.id ? ' active' : '') +
-      '" data-region="' + r.id + '">' + r.label + '</button>';
-  }).join('');
-
   return '<div class="vr-search-section">' +
     '<div class="vr-search-bar">' +
       '<div class="vr-search-input-wrap">' +
         '<span class="vr-search-icon">🔍</span>' +
         '<input type="text" id="vrKeyword" class="vr-search-input"' +
-          ' placeholder="Nhập từ khóa: serum nám, kem dưỡng, before after..."' +
+          ' placeholder="Nhập từ khóa bằng bất kỳ ngôn ngữ nào: serum nám, 기미 세럼, 淡斑霜..."' +
           ' value="' + esc(fs.keyword) + '" autocomplete="off">' +
       '</div>' +
       '<button class="btn btn-primary vr-search-btn" id="vrSearchBtn">Tìm kiếm</button>' +
@@ -70,10 +64,6 @@ function _buildSearchSection(fs) {
     '<div class="vr-filter-row">' +
       '<span class="vr-filter-label">Nền tảng</span>' +
       '<div class="vr-chip-group" id="platformChips">' + platformChips + '</div>' +
-    '</div>' +
-    '<div class="vr-filter-row">' +
-      '<span class="vr-filter-label">Thị trường</span>' +
-      '<div class="vr-chip-group" id="regionChips">' + regionChips + '</div>' +
     '</div>' +
   '</div>';
 }
@@ -113,9 +103,7 @@ function _buildReadyState() {
   if (isTikTok)   btns += '<a class="btn btn-primary vr-open-btn" href="' + tiktokUrl + '" target="_blank" rel="noopener noreferrer">Mở TikTok Search ↗</a>';
   if (isFacebook) btns += '<a class="btn btn-outline vr-open-btn" href="' + facebookUrl + '" target="_blank" rel="noopener noreferrer">Mở Facebook Videos ↗</a>';
 
-  var queryDisplay = query !== kw
-    ? '<div class="vr-query-display">Từ khóa: <strong>' + esc(kw) + '</strong> → <strong>' + esc(query) + '</strong></div>'
-    : '<div class="vr-query-display">Từ khóa: <strong>' + esc(query) + '</strong></div>';
+  var queryDisplay = '<div class="vr-query-display">Từ khóa: <strong>' + esc(query) + '</strong></div>';
 
   var tipRows = '';
   if (isTikTok)   tipRows += '<div class="vr-tip-row">📱 <strong>TikTok:</strong> Trang mở ra ở tab <strong>"Top"</strong> — đây là video viral nhất. Cuộn xuống 2–3 màn hình rồi mới thu thập.</div>';
@@ -453,8 +441,7 @@ function _mergeAndProcess(incoming) {
     var hoursOld = v.postedAt ? Math.max(1, (Date.now() - new Date(v.postedAt).getTime()) / 3600000) : null;
     var vph      = (hoursOld && v.views) ? v.views / hoursOld : null;
     return Object.assign({}, v, {
-      market:       v.market       || _lastMarket,
-      matchedQuery: v.matchedQuery || _lastQuery || _lastKeyword,
+      matchedQuery: v.matchedQuery || _lastQuery,
       viewsPerHour: v.viewsPerHour || vph
     });
   });
@@ -497,12 +484,8 @@ function _doSearch() {
 
   var fs        = state.viralResearch;
   _lastKeyword  = kw;
-  _lastMarket   = fs.region   || 'global';
   _lastPlatform = fs.platform || 'all';
-
-  _lastQuery = (typeof vrLocalizeQuery === 'function')
-    ? vrLocalizeQuery(kw, _lastMarket)
-    : kw;
+  _lastQuery    = kw;
 
   _hasSearched = true;
   _rerenderResults();
@@ -546,14 +529,6 @@ function _bindSearchEvents() {
     });
   });
 
-  $$('#regionChips .vr-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() {
-      state.viralResearch.region = chip.dataset.region;
-      $$('#regionChips .vr-chip').forEach(function(c) {
-        c.classList.toggle('active', c.dataset.region === chip.dataset.region);
-      });
-    });
-  });
 }
 
 /* ============================================================
