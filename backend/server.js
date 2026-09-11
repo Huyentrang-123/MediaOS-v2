@@ -11,8 +11,11 @@ app.use(express.static(PUBLIC));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', mode: 'browser-assisted', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+const translateRoute = require('./routes/translate');
+app.use('/api', translateRoute);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

@@ -1,109 +1,888 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MediaOS — Viral Research Platform</title>
+  <title>MediaOS</title>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.10/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <link rel="stylesheet" href="css/variables.css">
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/modules/viral-research.css">
+    :root {
+      --surface-1: #ffffff;
+      --surface-2: #f4f6f8;
+      --surface-3: #ebedf0;
+      --border: #dde1e7;
+      --text-primary: #111827;
+      --text-secondary: #6b7280;
+      --text-muted: #9ca3af;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --accent-light: #eef2ff;
+      --success: #059669;
+      --success-light: #ecfdf5;
+      --success-text: #065f46;
+      --warning: #d97706;
+      --warning-light: #fffbeb;
+      --warning-text: #92400e;
+      --danger: #dc2626;
+      --danger-light: #fef2f2;
+      --danger-text: #991b1b;
+      --radius: 8px;
+      --radius-sm: 5px;
+      --radius-lg: 12px;
+    }
+
+    [data-theme="dark"] {
+      --surface-1: #1c1f26;
+      --surface-2: #13151a;
+      --surface-3: #252830;
+      --border: #2e3340;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-light: #1e1b4b;
+      --success-light: #022c22;
+      --success-text: #34d399;
+      --warning-light: #1c1200;
+      --warning-text: #fbbf24;
+      --danger-light: #1f0000;
+      --danger-text: #f87171;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      background: var(--surface-2);
+      color: var(--text-primary);
+    }
+
+    #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+    .app-header {
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .app-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+    .app-logo-icon { font-size: 22px; }
+    .app-logo-sub { font-size: 11px; font-weight: 400; color: var(--text-secondary); }
+    .header-actions { display: flex; align-items: center; gap: 6px; }
+
+    .tab-nav {
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      display: flex;
+      gap: 2px;
+      overflow-x: auto;
+    }
+    .tab-nav::-webkit-scrollbar { height: 0; }
+
+    .tab-btn {
+      padding: 14px 16px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      font-family: inherit;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-content {
+      flex: 1;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      flex: 1;
+      min-width: 130px;
+    }
+    .stat-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+    .stat-value { font-size: 24px; font-weight: 700; }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
+    .stat-value.danger { color: var(--danger); }
+
+    .card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title { font-size: 15px; font-weight: 600; }
+    .card-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-input, .form-select, .form-textarea {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-size: 14px;
+      color: var(--text-primary);
+      font-family: inherit;
+      width: 100%;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--surface-1);
+    }
+    .form-textarea { resize: vertical; min-height: 80px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface-2); color: var(--text-primary); border-color: var(--border); }
+    .btn-secondary:hover:not(:disabled) { background: var(--surface-3); }
+    .btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+    .btn-danger:hover:not(:disabled) { background: var(--danger-light); }
+    .btn-ghost { background: transparent; color: var(--text-secondary); border-color: transparent; }
+    .btn-ghost:hover:not(:disabled) { background: var(--surface-3); color: var(--text-primary); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-lg { padding: 10px 18px; font-size: 14px; }
+    .btn-icon { padding: 7px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-success { background: var(--success-light); color: var(--success-text); }
+    .badge-accent { background: var(--accent-light); color: var(--accent); }
+
+    .alert {
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      margin-bottom: 12px;
+      border: 1px solid;
+    }
+    .alert-success { background: var(--success-light); color: var(--success-text); border-color: var(--success); }
+    .alert-danger { background: var(--danger-light); color: var(--danger-text); border-color: var(--danger); }
+
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+    th {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    td { border: 1px solid var(--border); padding: 7px 10px; color: var(--text-primary); vertical-align: middle; }
+    tr:hover td { background: var(--surface-2); }
+    td input, td select {
+      background: var(--surface-1);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 13px;
+      color: var(--text-primary);
+      font-family: inherit;
+      width: 100%;
+      min-width: 80px;
+    }
+    td input:focus, td select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+    .item-list { list-style: none; }
+    .item-list li { padding: 3px 0; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+    .item-list li::before { content: '·'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+    .checklist-card { border-left: 3px solid var(--accent); }
+    .checklist-card.completed { border-left-color: var(--success); }
+
+    .date-group { margin-bottom: 24px; }
+    .date-label {
+      font-size: 12px; font-weight: 700; color: var(--text-secondary);
+      background: var(--surface-3); padding: 4px 10px; border-radius: 4px;
+      display: inline-block; margin-bottom: 10px;
+    }
+
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .toolbar-search { flex: 1; min-width: 200px; }
+
+    .translation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 768px) { .translation-grid { grid-template-columns: 1fr; } }
+    .translation-panel { display: flex; flex-direction: column; gap: 8px; }
+    .translation-label { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .translation-area { min-height: 160px; resize: vertical; }
+
+    .template-item {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .template-name { font-weight: 600; font-size: 13px; min-width: 100px; flex-shrink: 0; }
+    .template-preview {
+      font-size: 12px; color: var(--text-secondary); flex: 1;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+
+    .history-item {
+      background: var(--surface-1); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px; margin-bottom: 10px;
+    }
+    .history-source { font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; }
+    .history-result { font-size: 13px; color: var(--text-primary); }
+    .history-time { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+    .status-badge { display: inline-flex; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .status-0 { background: var(--surface-3); color: var(--text-secondary); }
+    .status-1 { background: var(--accent-light); color: var(--accent); }
+    .status-2 { background: var(--warning-light); color: var(--warning-text); }
+    .status-3 { background: var(--success-light); color: var(--success-text); }
+    .status-4 { background: var(--danger-light); color: var(--danger-text); }
+    .status-5 { background: #f3e8ff; color: #7c3aed; }
+
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block;
+    }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; padding: 16px;
+    }
+    .modal {
+      background: var(--surface-1); border-radius: var(--radius-lg);
+      padding: 24px; max-width: 480px; width: 100%; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    .notes-box {
+      margin-top: 10px; padding: 8px 12px;
+      background: var(--surface-2); border-radius: var(--radius-sm);
+      font-size: 13px; color: var(--text-secondary);
+    }
+
+    @media (max-width: 640px) {
+      .tab-content { padding: 12px 14px; }
+      .stats-bar { gap: 8px; }
+      .stat-card { min-width: 100px; padding: 10px 14px; }
+      .stat-value { font-size: 20px; }
+      .card { padding: 14px; }
+      .app-header { padding: 0 14px; }
+    }
+  </style>
 </head>
 <body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
 
-  <div class="app" id="app">
+const generateId = () => Math.random().toString(36).substr(2,9) + Date.now().toString(36).substr(-4);
+const getToday = () => new Date().toISOString().split('T')[0];
+const formatDate = (d) => {
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+};
+const formatDT = (iso) => iso ? new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '';
 
-    <!-- ========== Sidebar ========== -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
-          <span class="logo-icon">🎬</span>
-          <div class="logo-text">
-            <div class="logo-title">MediaOS</div>
-            <div class="logo-sub">Viral Research Platform</div>
+const EDITORS_DEFAULT = ['Editor 1','Editor 2','Editor 3','Editor 4','Editor 5','Editor 6','Editor 7'];
+const KOC_STATUSES = ['Chưa phản hồi','Đang trao đổi','Đã book','Completed','Không hợp tác','Book tiếp video khác'];
+const TRANSLATION_MODE = 'proxy';
+
+function useLocalStorage(key, initial) {
+  const [val, setVal] = useState(() => {
+    try { const s = localStorage.getItem(key); return s !== null ? JSON.parse(s) : initial; }
+    catch { return initial; }
+  });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }, [key, val]);
+  return [val, setVal];
+}
+
+async function translateDirect(text, apiKey) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content:
+        `Bạn là dịch giả chuyên nghiệp. Hãy dịch đoạn văn bản sau từ tiếng Trung phồn thể (Đài Loan) sang tiếng Việt tự nhiên, chính xác. Chỉ trả về bản dịch, không giải thích:\n\n${text}` }]
+    })
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `Lỗi API: ${res.status}`); }
+  return (await res.json()).content[0].text;
+}
+
+async function translateProxy(text) {
+  const res = await fetch('/api/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error || `Lỗi: ${res.status}`); }
+  return (await res.json()).translation;
+}
+
+const StatCard = ({ label, value, color }) => (
+  <div className="stat-card">
+    <div className="stat-label">{label}</div>
+    <div className={`stat-value${color?' '+color:''}`}>{value}</div>
+  </div>
+);
+
+function SettingsModal({ editors, onSave, onClose }) {
+  const [names, setNames] = useState([...editors]);
+  const update = (i, v) => { const n=[...names]; n[i]=v; setNames(n); };
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-title">⚙️ Cài đặt – Tên Editor</div>
+        <div className="form-grid">
+          {names.map((name,i)=>(
+            <div key={i} className="form-group">
+              <label className="form-label">Editor {i+1}</label>
+              <input className="form-input" value={name} onChange={e=>update(i,e.target.value)} placeholder={`Editor ${i+1}`}/>
+            </div>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Hủy</button>
+          <button className="btn btn-primary" onClick={()=>{onSave(names);onClose();}}>Lưu</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChecklistForm({ editors, onAdd }) {
+  const [editor, setEditor] = useState(editors[0]||'');
+  const [date, setDate] = useState(getToday());
+  const [items, setItems] = useState('');
+  const [notes, setNotes] = useState('');
+  const [err, setErr] = useState('');
+
+  useEffect(()=>{ if (!editor&&editors.length) setEditor(editors[0]); },[editors]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const list = items.split('\n').map(s=>s.trim()).filter(Boolean);
+    if (!editor.trim()) return setErr('Vui lòng chọn editor.');
+    if (!list.length) return setErr('Vui lòng nhập ít nhất 1 công việc.');
+    setErr('');
+    onAdd({ id:generateId(), date, editor, items:list, notes, completed:false, createdAt:new Date().toISOString() });
+    setItems(''); setNotes('');
+  };
+
+  return (
+    <div className="card">
+      <div className="card-title" style={{marginBottom:14}}>➕ Thêm Checklist</div>
+      {err && <div className="alert alert-danger">{err}</div>}
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          <div className="form-group">
+            <label className="form-label">Editor</label>
+            <select className="form-select" value={editor} onChange={e=>setEditor(e.target.value)}>
+              {editors.map(ed=><option key={ed} value={ed}>{ed}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Ngày</label>
+            <input className="form-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/>
+          </div>
+          <div className="form-group full">
+            <label className="form-label">Công việc hôm nay (mỗi dòng 1 việc)</label>
+            <textarea className="form-textarea" value={items} onChange={e=>setItems(e.target.value)}
+              placeholder="Viết content video sản phẩm A\nChỉnh sửa video B\nLên kế hoạch C..." style={{minHeight:100}}/>
+          </div>
+          <div className="form-group full">
+            <label className="form-label">Ghi chú (tùy chọn)</label>
+            <textarea className="form-textarea" value={notes} onChange={e=>setNotes(e.target.value)}
+              placeholder="Ghi chú thêm..." style={{minHeight:60}}/>
           </div>
         </div>
-        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
-      </div>
-
-      <nav class="sidebar-nav" id="sidebarNav">
-        <div class="nav-section">
-          <div class="nav-section-label">NGHIÊN CỨU</div>
-          <a class="nav-item" data-page="research" href="#research">
-            <span class="nav-icon">🔍</span>
-            <span class="nav-label">Viral Search</span>
-          </a>
+        <div style={{marginTop:14}}>
+          <button className="btn btn-primary" type="submit">💾 Lưu Checklist</button>
         </div>
-      </nav>
+      </form>
+    </div>
+  );
+}
 
-      <div class="sidebar-footer">
-        <div class="user-info">
-          <span class="user-avatar">👤</span>
-          <div>
-            <div class="user-name">Media Team</div>
-            <div class="user-role">MediaOS v2</div>
+function ChecklistCard({ item, onToggle, onDelete }) {
+  return (
+    <div className={`card checklist-card${item.completed?' completed':''}`}>
+      <div className="card-header">
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+            <span className="card-title">{item.editor}</span>
+            <span className={`badge ${item.completed?'badge-success':'badge-accent'}`}>
+              {item.completed?'✅ Hoàn thành':'⏳ Đang làm'}
+            </span>
+          </div>
+          <div className="card-meta">{item.items.length} công việc · {formatDT(item.createdAt)}</div>
+        </div>
+        <div style={{display:'flex',gap:6,flexShrink:0}}>
+          <button className="btn btn-secondary btn-sm" onClick={()=>onToggle(item.id)}>
+            {item.completed?'↩ Mở lại':'✅ Xong'}
+          </button>
+          <button className="btn btn-danger btn-sm btn-icon" onClick={()=>onDelete(item.id)}>🗑</button>
+        </div>
+      </div>
+      <ul className="item-list">{item.items.map((it,i)=><li key={i}>{it}</li>)}</ul>
+      {item.notes && <div className="notes-box">📝 {item.notes}</div>}
+    </div>
+  );
+}
+
+function DailyChecklistTab({ editors }) {
+  const [checklists, setChecklists] = useLocalStorage('mediaos_checklists',[]);
+  const today = getToday();
+
+  const grouped = useMemo(() => {
+    const sorted = [...checklists].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+    const map = {};
+    sorted.forEach(c=>{ if(!map[c.date]) map[c.date]=[]; map[c.date].push(c); });
+    return Object.entries(map);
+  }, [checklists]);
+
+  return (
+    <div>
+      <div className="stats-bar">
+        <StatCard label="Hôm nay" value={checklists.filter(c=>c.date===today).length} color="accent"/>
+        <StatCard label="Tổng checklist" value={checklists.length}/>
+        <StatCard label="Hoàn thành" value={checklists.filter(c=>c.completed).length} color="success"/>
+        <StatCard label="Đang làm" value={checklists.filter(c=>!c.completed).length}/>
+      </div>
+      <ChecklistForm editors={editors} onAdd={item=>setChecklists(prev=>[item,...prev])}/>
+      {grouped.length===0 ? (
+        <div className="empty-state"><div className="empty-icon">📋</div><div className="empty-text">Chưa có checklist nào. Thêm checklist đầu tiên!</div></div>
+      ) : grouped.map(([date,items])=>(
+        <div key={date} className="date-group">
+          <div className="date-label">{date===today?'📅 Hôm nay – ':''}{formatDate(date)}</div>
+          {items.map(item=>(
+            <ChecklistCard key={item.id} item={item}
+              onToggle={id=>setChecklists(prev=>prev.map(c=>c.id===id?{...c,completed:!c.completed}:c))}
+              onDelete={id=>{ if(confirm('Xóa checklist này?')) setChecklists(prev=>prev.filter(c=>c.id!==id)); }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PasteParser({ onAdd }) {
+  const [text, setText] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const parse = () => {
+    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+    let added=0, skipped=0;
+    const kocs=[];
+    for (const line of lines) {
+      const parts = line.split('|').map(s=>s.trim());
+      if (parts.length<2||!parts[0]) { skipped++; continue; }
+      kocs.push({ id:generateId(), name:parts[0]||'', instagram:parts[1]||'', gmail:parts[2]||'', followers:parts[3]||'',
+        status:'Chưa phản hồi', price:'', address:'', bankAccount:'', notes:'',
+        lastContact:getToday(), createdAt:new Date().toISOString() });
+      added++;
+    }
+    if (kocs.length) onAdd(kocs);
+    setMsg(`✅ Đã thêm ${added} KOC${skipped?` · Bỏ qua ${skipped} dòng không hợp lệ`:''}`);
+    setText('');
+    setTimeout(()=>setMsg(''),4000);
+  };
+
+  return (
+    <div className="card">
+      <div className="card-title" style={{marginBottom:10}}>📋 Dán dữ liệu KOC</div>
+      <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:8}}>
+        Định dạng: <code style={{background:'var(--surface-3)',padding:'1px 6px',borderRadius:4}}>Tên | Instagram | Gmail | Followers</code> (mỗi dòng 1 KOC)
+      </div>
+      <textarea className="form-textarea" value={text} onChange={e=>setText(e.target.value)}
+        placeholder="Nguyễn Văn A | @vana | vana@gmail.com | 50k\nNguyễn Văn B | @vanb | vanb@gmail.com | 120k" style={{minHeight:80}}/>
+      {msg && <div className="alert alert-success" style={{marginTop:8}}>{msg}</div>}
+      <div style={{marginTop:10}}>
+        <button className="btn btn-primary" onClick={parse} disabled={!text.trim()}>➕ Parse &amp; Thêm vào DB</button>
+      </div>
+    </div>
+  );
+}
+
+function EditableCell({ value, onChange, type='text', options }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value);
+  const ref = useRef(null);
+
+  useEffect(()=>{ setVal(value); },[value]);
+  useEffect(()=>{ if(editing&&ref.current) ref.current.focus(); },[editing]);
+
+  const save = () => { setEditing(false); if(val!==value) onChange(val); };
+
+  if (type==='select') return (
+    <select ref={ref} value={val} onChange={e=>{ setVal(e.target.value); onChange(e.target.value); }} style={{minWidth:130}}>
+      {options.map(o=><option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+
+  if (editing) return (
+    <input ref={ref} value={val} onChange={e=>setVal(e.target.value)} onBlur={save}
+      onKeyDown={e=>{ if(e.key==='Enter') save(); if(e.key==='Escape'){setEditing(false);setVal(value);} }}
+      style={{minWidth:80}}/>
+  );
+
+  return (
+    <span onClick={()=>setEditing(true)} title="Click để chỉnh sửa"
+      style={{cursor:'pointer',minWidth:60,display:'inline-block',borderBottom:'1px dashed var(--border)'}}>
+      {val||<span style={{color:'var(--text-muted)'}}>–</span>}
+    </span>
+  );
+}
+
+function KOCDatabaseTab() {
+  const [kocs, setKocs] = useLocalStorage('mediaos_kocs',[]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const handleUpdate = (id, changes) =>
+    setKocs(prev=>prev.map(k=>k.id===id?{...k,...changes,lastContact:getToday()}:k));
+
+  const filtered = useMemo(()=>kocs.filter(k=>{
+    const q=search.toLowerCase();
+    return (!q||k.name.toLowerCase().includes(q)||k.instagram.toLowerCase().includes(q)||k.gmail.toLowerCase().includes(q))
+      &&(!statusFilter||k.status===statusFilter);
+  }),[kocs,search,statusFilter]);
+
+  const stats = useMemo(()=>({
+    total:kocs.length,
+    negotiating:kocs.filter(k=>k.status==='Đang trao đổi').length,
+    booked:kocs.filter(k=>k.status==='Đã book').length,
+    completed:kocs.filter(k=>k.status==='Completed').length,
+  }),[kocs]);
+
+  return (
+    <div>
+      <div className="stats-bar">
+        <StatCard label="Tổng KOC" value={stats.total}/>
+        <StatCard label="Đang trao đổi" value={stats.negotiating} color="accent"/>
+        <StatCard label="Đã book" value={stats.booked} color="warning"/>
+        <StatCard label="Completed" value={stats.completed} color="success"/>
+      </div>
+      <PasteParser onAdd={newKocs=>setKocs(prev=>[...newKocs,...prev])}/>
+      <div className="toolbar">
+        <input className="form-input toolbar-search" placeholder="🔍 Tìm theo tên, Instagram, Email..."
+          value={search} onChange={e=>setSearch(e.target.value)}/>
+        <select className="form-select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{minWidth:160}}>
+          <option value="">Tất cả trạng thái</option>
+          {KOC_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      {filtered.length===0 ? (
+        <div className="empty-state"><div className="empty-icon">👥</div>
+          <div className="empty-text">{kocs.length===0?'Chưa có KOC nào. Dán dữ liệu để thêm!':'Không tìm thấy KOC nào phù hợp.'}</div></div>
+      ) : (
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div className="table-wrapper">
+            <table>
+              <thead><tr>
+                <th style={{width:36}}>#</th><th>Tên</th><th>Instagram</th><th>Gmail</th><th>Followers</th>
+                <th>Trạng thái</th><th>Giá</th><th>Địa chỉ</th><th>Số TK</th><th>Ghi chú</th>
+                <th>Liên hệ cuối</th><th></th>
+              </tr></thead>
+              <tbody>
+                {filtered.map((k,i)=>(
+                  <tr key={k.id}>
+                    <td style={{color:'var(--text-muted)'}}>{i+1}</td>
+                    <td style={{minWidth:120}}><EditableCell value={k.name} onChange={v=>handleUpdate(k.id,{name:v})}/></td>
+                    <td style={{minWidth:120}}><EditableCell value={k.instagram} onChange={v=>handleUpdate(k.id,{instagram:v})}/></td>
+                    <td style={{minWidth:160}}><EditableCell value={k.gmail} onChange={v=>handleUpdate(k.id,{gmail:v})}/></td>
+                    <td style={{minWidth:70}}><EditableCell value={k.followers} onChange={v=>handleUpdate(k.id,{followers:v})}/></td>
+                    <td><EditableCell value={k.status} onChange={v=>handleUpdate(k.id,{status:v})} type="select" options={KOC_STATUSES}/></td>
+                    <td style={{minWidth:80}}><EditableCell value={k.price} onChange={v=>handleUpdate(k.id,{price:v})}/></td>
+                    <td style={{minWidth:120}}><EditableCell value={k.address} onChange={v=>handleUpdate(k.id,{address:v})}/></td>
+                    <td style={{minWidth:120}}><EditableCell value={k.bankAccount} onChange={v=>handleUpdate(k.id,{bankAccount:v})}/></td>
+                    <td style={{minWidth:120}}><EditableCell value={k.notes} onChange={v=>handleUpdate(k.id,{notes:v})}/></td>
+                    <td style={{whiteSpace:'nowrap',fontSize:12,color:'var(--text-secondary)'}}>{k.lastContact||'–'}</td>
+                    <td><button className="btn btn-danger btn-sm btn-icon"
+                      onClick={()=>{ if(confirm('Xóa KOC này?')) setKocs(prev=>prev.filter(x=>x.id!==k.id)); }}>🗑</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-    </aside>
+      )}
+    </div>
+  );
+}
 
-    <!-- ========== Main Content ========== -->
-    <main class="main-content" id="mainContent">
-      <header class="topbar" id="topbar">
-        <button class="topbar-menu" id="topbarMenu" aria-label="Mở menu">☰</button>
-        <div class="topbar-title" id="topbarTitle">Viral Search</div>
-        <div class="topbar-actions">
-          <button class="btn btn-ghost btn-sm" id="themeToggle" title="Đổi theme">🌙</button>
+function APISettings({ apiKey, onSave }) {
+  const [key, setKey] = useState(apiKey||'');
+  const [saved, setSaved] = useState(false);
+  const handleSave = () => { onSave(key.trim()); setSaved(true); setTimeout(()=>setSaved(false),2000); };
+  if (apiKey) return (
+    <div className="alert alert-success" style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+      <span>✅ Claude API key đã được cấu hình</span>
+      <button className="btn btn-secondary btn-sm" onClick={()=>onSave('')}>Xóa key</button>
+    </div>
+  );
+  return (
+    <div style={{background:'var(--warning-light)',border:'1px solid var(--warning)',borderRadius:'var(--radius)',padding:16,marginBottom:20}}>
+      <div style={{fontWeight:700,color:'var(--warning-text)',marginBottom:8,fontSize:14}}>🔑 Cấu hình Claude API Key</div>
+      <div style={{fontSize:12,color:'var(--warning-text)',marginBottom:10}}>Nhập Anthropic API key để sử dụng tính năng dịch thuật.</div>
+      <div style={{display:'flex',gap:8}}>
+        <input className="form-input" type="password" placeholder="sk-ant-..." value={key}
+          onChange={e=>setKey(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSave()} style={{flex:1}}/>
+        <button className="btn btn-primary" onClick={handleSave} disabled={!key.trim()}>{saved?'✅ Đã lưu':'Lưu key'}</button>
+      </div>
+    </div>
+  );
+}
+
+function TranslationTab({ mode }) {
+  const [apiKey, setApiKey] = useLocalStorage('mediaos_api_key','');
+  const [translations, setTranslations] = useLocalStorage('mediaos_translations',[]);
+  const [templates, setTemplates] = useLocalStorage('mediaos_templates',[]);
+  const [source, setSource] = useState('');
+  const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [histSearch, setHistSearch] = useState('');
+  const [tplName, setTplName] = useState('');
+  const [showTplSave, setShowTplSave] = useState(false);
+
+  const canTranslate = source.trim() && (mode==='proxy'||apiKey);
+
+  const doTranslate = async () => {
+    if (!canTranslate) return;
+    setLoading(true); setError(''); setResult('');
+    try {
+      const text = mode==='proxy' ? await translateProxy(source) : await translateDirect(source,apiKey);
+      setResult(text);
+    } catch(e) { setError(e.message||'Dịch thất bại. Vui lòng thử lại.'); }
+    finally { setLoading(false); }
+  };
+
+  const doCopy = () => {
+    if (!result) return;
+    navigator.clipboard.writeText(result).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+  };
+
+  const filteredHist = useMemo(()=>{
+    if (!histSearch) return translations;
+    const q=histSearch.toLowerCase();
+    return translations.filter(t=>t.source.toLowerCase().includes(q)||t.result.toLowerCase().includes(q));
+  },[translations,histSearch]);
+
+  return (
+    <div>
+      <div className="stats-bar">
+        <StatCard label="Đã dịch" value={translations.length} color="accent"/>
+        <StatCard label="Templates" value={templates.length}/>
+      </div>
+      {mode==='direct' && <APISettings apiKey={apiKey} onSave={setApiKey}/>}
+      <div className="card">
+        <div className="card-title" style={{marginBottom:14}}>🌐 Dịch Đài Loan → Việt Nam</div>
+        <div className="translation-grid">
+          <div className="translation-panel">
+            <div className="translation-label">📥 Tiếng Trung (Đài Loan)</div>
+            <textarea className="form-textarea translation-area" value={source} onChange={e=>setSource(e.target.value)}
+              placeholder="Dán văn bản tiếng Trung vào đây..."/>
+          </div>
+          <div className="translation-panel">
+            <div className="translation-label">📤 Tiếng Việt</div>
+            <textarea className="form-textarea translation-area" value={result} onChange={e=>setResult(e.target.value)}
+              placeholder="Bản dịch sẽ xuất hiện ở đây..." readOnly={loading}/>
+          </div>
+        </div>
+        {error && <div className="alert alert-danger">{error}</div>}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
+          <button className="btn btn-primary btn-lg" onClick={doTranslate} disabled={!canTranslate||loading}>
+            {loading?<><span className="spinner"></span> Đang dịch...</>:'🔄 Dịch'}
+          </button>
+          <button className="btn btn-secondary" onClick={doCopy} disabled={!result}>{copied?'✅ Đã sao chép!':'📋 Sao chép'}</button>
+          <button className="btn btn-secondary" onClick={()=>{
+            if(!source||!result) return;
+            setTranslations(prev=>[{id:generateId(),source,result,createdAt:new Date().toISOString()},...prev]);
+            setSource(''); setResult('');
+          }} disabled={!source||!result}>💾 Lưu lịch sử</button>
+          <button className="btn btn-secondary" onClick={()=>setShowTplSave(!showTplSave)} disabled={!source}>📌 Lưu template</button>
+        </div>
+        {showTplSave && (
+          <div style={{display:'flex',gap:8,marginTop:10}}>
+            <input className="form-input" placeholder="Tên template..." value={tplName}
+              onChange={e=>setTplName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(tplName.trim()&&(setTemplates(prev=>[...prev,{id:generateId(),name:tplName.trim(),content:source}]),setTplName(''),setShowTplSave(false)))}
+              style={{flex:1}}/>
+            <button className="btn btn-primary" onClick={()=>{
+              if(!tplName.trim()) return;
+              setTemplates(prev=>[...prev,{id:generateId(),name:tplName.trim(),content:source}]);
+              setTplName(''); setShowTplSave(false);
+            }} disabled={!tplName.trim()}>Lưu</button>
+            <button className="btn btn-secondary" onClick={()=>setShowTplSave(false)}>Hủy</button>
+          </div>
+        )}
+      </div>
+      {templates.length>0 && (
+        <div className="card">
+          <div className="card-title" style={{marginBottom:12}}>📌 Templates ({templates.length})</div>
+          {templates.map(t=>(
+            <div key={t.id} className="template-item">
+              <span className="template-name">{t.name}</span>
+              <span className="template-preview">{t.content.substring(0,100)}{t.content.length>100?'…':''}</span>
+              <button className="btn btn-secondary btn-sm" onClick={()=>setSource(t.content)}>Dùng</button>
+              <button className="btn btn-danger btn-sm btn-icon" onClick={()=>setTemplates(prev=>prev.filter(x=>x.id!==t.id))}>🗑</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="card">
+        <div className="card-title" style={{marginBottom:12}}>📜 Lịch sử dịch ({translations.length})</div>
+        {translations.length>0 && (
+          <input className="form-input" placeholder="🔍 Tìm trong lịch sử..." value={histSearch}
+            onChange={e=>setHistSearch(e.target.value)} style={{marginBottom:12}}/>
+        )}
+        {filteredHist.length===0 ? (
+          <div className="empty-state" style={{padding:24}}>
+            <div className="empty-icon">📜</div>
+            <div className="empty-text">{translations.length===0?'Chưa có lịch sử dịch.':'Không tìm thấy.'}</div>
+          </div>
+        ) : filteredHist.map(t=>(
+          <div key={t.id} className="history-item">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div className="history-source">🇹🇼 {t.source.substring(0,120)}{t.source.length>120?'…':''}</div>
+                <div className="history-result">🇻🇳 {t.result.substring(0,120)}{t.result.length>120?'…':''}</div>
+                <div className="history-time">{formatDT(t.createdAt)}</div>
+              </div>
+              <div style={{display:'flex',gap:4,flexShrink:0}}>
+                <button className="btn btn-secondary btn-sm" onClick={()=>{setSource(t.source);setResult(t.result);}}>Dùng lại</button>
+                <button className="btn btn-danger btn-sm btn-icon" onClick={()=>setTranslations(prev=>prev.filter(x=>x.id!==t.id))}>🗑</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [activeTab, setActiveTab] = useState('checklist');
+  const [theme, setTheme] = useLocalStorage('mediaos_theme','light');
+  const [editors, setEditors] = useLocalStorage('mediaos_editors',EDITORS_DEFAULT);
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(()=>{ document.documentElement.setAttribute('data-theme',theme); },[theme]);
+
+  return (
+    <div id="app">
+      {showSettings && <SettingsModal editors={editors} onSave={setEditors} onClose={()=>setShowSettings(false)}/>}
+      <header className="app-header">
+        <div className="app-logo">
+          <span className="app-logo-icon">🎬</span>
+          <div><div>MediaOS</div><div className="app-logo-sub">Media Department</div></div>
+        </div>
+        <div className="header-actions">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={()=>setShowSettings(true)} title="Cài đặt">⚙️</button>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={()=>setTheme(t=>t==='light'?'dark':'light')} title="Đổi theme">
+            {theme==='light'?'🌙':'☀️'}
+          </button>
         </div>
       </header>
-
-      <div class="page-container" id="pageContainer">
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <p>Đang tải...</p>
-        </div>
-      </div>
-    </main>
-
-  </div><!-- /.app -->
-
-  <!-- ========== Modal ========== -->
-  <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
-    <div class="modal" id="modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <h3 class="modal-title" id="modalTitle"></h3>
-        <button class="modal-close" id="modalClose" aria-label="Đóng">✕</button>
-      </div>
-      <div class="modal-body" id="modalBody"></div>
-      <div class="modal-footer" id="modalFooter"></div>
+      <nav className="tab-nav">
+        {[{id:'checklist',label:'📋 Daily Checklist'},{id:'koc',label:'👥 KOC Database'},{id:'translation',label:'🌐 Translation'}]
+          .map(tab=>(
+            <button key={tab.id} className={`tab-btn${activeTab===tab.id?' active':''}`}
+              onClick={()=>setActiveTab(tab.id)}>{tab.label}</button>
+          ))}
+      </nav>
+      <main className="tab-content">
+        {activeTab==='checklist' && <DailyChecklistTab editors={editors}/>}
+        {activeTab==='koc' && <KOCDatabaseTab/>}
+        {activeTab==='translation' && <TranslationTab mode={TRANSLATION_MODE}/>}
+      </main>
     </div>
-  </div>
+  );
+}
 
-  <!-- ========== Toast ========== -->
-  <div class="toast-container" id="toastContainer"></div>
-
-  <!-- ========== Sidebar overlay (mobile) ========== -->
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
-
-  <!-- ========== Scripts ========== -->
-  <script src="js/utils/dom.js"></script>
-  <script src="js/utils/format.js"></script>
-  <script src="js/utils/toast.js"></script>
-
-  <script src="js/config.js"></script>
-  <script src="js/state.js"></script>
-
-  <!-- Viral Research module -->
-  <script src="modules/viral-research/viral-score.js"></script>
-  <script src="modules/viral-research/query-expansion.js"></script>
-  <script src="modules/viral-research/cards.js"></script>
-  <script src="modules/viral-research/index.js"></script>
-
-  <!-- Router + App init (must be last) -->
-  <script src="js/router.js"></script>
-  <script src="js/app.js"></script>
-
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
